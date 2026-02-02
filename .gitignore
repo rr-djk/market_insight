@@ -1,2 +1,22 @@
+# Fichiers d'apprentissage
 projet_strategies_investissement.md
 stack_technique_projet_backtesting.md
+tricks.md
+
+# Données (ne jamais commit les données)
+data/
+*.csv
+*.db
+*.sqlite
+
+# Python
+venv/
+env/
+ENV/
+
+# Environnement
+.env 
+.venv
+
+# C++
+*.o
