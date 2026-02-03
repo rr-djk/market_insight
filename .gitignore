@@ -1,7 +1,5 @@
 # Fichiers d'apprentissage
-projet_strategies_investissement.md
-stack_technique_projet_backtesting.md
-tricks.md
+doc_apprentissage/
 
 # Données (ne jamais commit les données)
 data/
@@ -20,3 +18,7 @@ ENV/
 
 # C++
 *.o
+
+# Logs
+logs/
+*.log
