@@ -40,6 +40,36 @@ services:
       - pgadmin_data:/var/lib/pgadmin
     restart: unless-stopped
 
+  spark-master:
+    image: bitnami/spark:3.5
+    container_name: market_insight_spark_master
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+    ports:
+      - "8080:8080"   # Spark Web UI
+      - "7077:7077"   # Spark Master
+    volumes:
+      - ./data:/data
+      - ./scripts:/scripts
+    restart: unless-stopped
+
+  spark-worker:
+    image: bitnami/spark:3.5
+    container_name: market_insight_spark_worker
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_WORKER_CORES=2
+    depends_on:
+      - spark-master
+    volumes:
+      - ./data:/data
+      - ./scripts:/scripts
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   pgadmin_data:
