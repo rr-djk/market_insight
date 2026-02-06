@@ -25,7 +25,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def read_test_symbols(filepath="data/test_symbols.txt"):
+def read_test_symbols(filepath="data/test/test_symbols.txt"):
     """
     Lit la liste des symboles de test
     
@@ -196,7 +196,7 @@ def main():
     if all_data:
         combined_df = pd.concat(all_data, ignore_index=True)
         combined_df = combined_df.sort_values(['Symbol', 'Date'])
-        combined_path = Path("data/raw") / "test_combined.csv"
+        combined_path = Path("data/test") / "test_combined.csv"
         combined_df.to_csv(combined_path, index=False)
         logger.info(f"\n💾 Fichier combiné sauvegardé: {combined_path}")
     
@@ -229,7 +229,7 @@ def main():
         print()
         print("Les données sont disponibles dans: data/raw/")
         print("Fichiers individuels: SYMBOLE.csv")
-        print("Fichier combiné: test_combined.csv")
+        print("Fichier combiné: data/test/test_combined.csv")
         return 0
     else:
         print("❌ AUCUN TÉLÉCHARGEMENT RÉUSSI")
