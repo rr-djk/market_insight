@@ -18,6 +18,7 @@ ENV/
 
 # C++
 *.o
+backend/build/
 
 # Logs
 logs/
