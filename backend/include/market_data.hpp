@@ -31,6 +31,13 @@ public:
      */
     const std::vector<Price>& get_prices(const std::string& symbol) const;
 
+    /**
+     * Recupere la liste de tous les symboles disponibles en base.
+     * @param db Connexion a la base de donnees PostgreSQL.
+     * @return Vecteur de symboles tries par ordre alphabetique.
+     */
+    const std::vector<std::string> get_supported_symbols(Database& db);
+
 private:
     std::map<std::string, std::vector<Price>> data;
 };
