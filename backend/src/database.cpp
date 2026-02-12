@@ -44,7 +44,8 @@ std::vector<std::string> Database::get_symbols() {
     txn.commit();
 
     std::vector<std::string> symbols;
-    symbols.reserve(result.size());
+    std::size_t count = static_cast<std::size_t>(result.size());
+    symbols.reserve(count);
 
     for (const auto& row : result) {
         symbols.push_back(row[0].as<std::string>());
@@ -83,18 +84,19 @@ std::vector<Price> Database::get_prices(const std::string& symbol,
     txn.commit();
 
     std::vector<Price> prices;
-    prices.reserve(result.size());
+    std::size_t count = static_cast<std::size_t>(result.size());
+    prices.reserve(count);
 
     // Pas de vérification de NULL : le schéma SQL impose NOT NULL sur toutes les colonnes
     for (const auto& row : result) {
-        prices.push_back({
-            row[0].as<std::string>(),
-            row[1].as<double>(),
-            row[2].as<double>(),
-            row[3].as<double>(),
-            row[4].as<double>(),
-            row[5].as<long>()
-        });
+      prices.push_back({
+          row[0].as<std::string>(),
+          row[1].as<double>(),
+          row[2].as<double>(),
+          row[3].as<double>(),
+          row[4].as<double>(),
+          row[5].as<long>()
+          });
     }
 
     return prices;
