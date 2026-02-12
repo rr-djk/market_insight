@@ -44,11 +44,13 @@ public:
      */
     double compute_total_value(const std::unordered_map<std::string, double>& current_prices) const;
 
+    double get_initial_cash() const;
     double get_available_cash() const;
     const std::unordered_map<std::string, int>& get_stock_positions() const;
     const std::vector<Transaction>& get_transaction_history() const;
 
 private:
+    double initial_cash;
     double available_cash;
     std::unordered_map<std::string, int> stock_positions;
     std::vector<Transaction> transaction_history;
