@@ -24,7 +24,7 @@ Projet à but académique visant à :
 - libpqxx 7.8.1 (compilée depuis les sources avec C++20)
 - libpq-dev
 
-## Quickstart
+## Mise en route rapide
 
 ```bash
 # Démarrer PostgreSQL
@@ -36,7 +36,3 @@ cd backend && make
 # Exécuter
 make run
 ```
-
-## Licence
-
-Projet personnel à but pédagogique.
