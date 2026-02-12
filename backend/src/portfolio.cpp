@@ -1,6 +1,7 @@
 #include "portfolio.hpp"
 
-Portfolio::Portfolio(double initial_cash) : available_cash(initial_cash) {}
+Portfolio::Portfolio(double initial_cash)
+    : initial_cash(initial_cash), available_cash(initial_cash) {}
 
 bool Portfolio::buy_stock(const std::string& symbol, int quantity,
                           double unit_price, const std::string& date) {
@@ -40,6 +41,10 @@ double Portfolio::compute_total_value(
     }
 
     return total;
+}
+
+double Portfolio::get_initial_cash() const {
+    return initial_cash;
 }
 
 double Portfolio::get_available_cash() const {
