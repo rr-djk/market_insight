@@ -1,20 +1,28 @@
 # Market Insight
 
-Plateforme de backtesting qui permet de tester des stratégies d'investissement en recueillant les règles de l'utilisateur (seuils d'achat/vente, sélection d'actions) et en les appliquant sur des données boursières historiques du NASDAQ (~34M lignes, 11 727 symboles).
+Plateforme de backtesting de stratégies d'investissement en C++, appliquée sur des données boursières historiques du NASDAQ (~34M lignes, 11 727 symboles).
 
-Projet à but académique visant à :
-- comprendre l'architecture d'une application complète (frontend, backend, base de données, déploiement)
-- approfondir le C++ dans un contexte concret
-- implémenter du parallélisme CPU et GPU (CUDA)
-- manipuler des bases de données avec de gros volumes de données
-- découvrir le déploiement cloud (AWS)
+## Focus MVP
+
+Afin d'accélérer la mise en production, le développement se concentre d'abord sur un **MVP centré sur la théorie de Charles Gaves** : équipondération du portefeuille avec rééquilibrage périodique.
+
+L'utilisateur choisit un panier d'actions, un budget de départ, une période et une fréquence de rééquilibrage. Le MVP produit un backtest comparatif :
+- **Avec rééquilibrage** (stratégie Gaves) : le portefeuille est redistribué à parts égales à chaque période
+- **Sans rééquilibrage** (buy & hold) : le portefeuille conserve ses positions initiales
+
+Résultat : graphe d'évolution comparative + métriques (rendement, drawdown, nombre de rééquilibrages).
+
+## Vision long-terme
+
+Le projet vise à devenir une plateforme complète avec parallélisation (CPU/GPU CUDA), API REST, frontend React et déploiement AWS. Ces étapes seront abordées après le MVP.
 
 ## Avancement
 
 - **Données** : acquisition, validation et import terminés
 - **Base de données** : PostgreSQL opérationnel (schéma, indexation, 33.7M lignes)
-- **Backend C++** : fondations en place (connexion BDD, structures de données, interface stratégies)
-- **En cours** : moteur de backtesting séquentiel
+- **Backend C++** : fondations en place (connexion BDD, structures de données, moteur de backtesting)
+- **Stratégies** : EqualWeightStrategy (Gave) et BuyAndHoldStrategy implémentées
+- **En cours** : tests des stratégies, interface utilisateur et graphe comparatif
 
 ## Prérequis
 
