@@ -11,6 +11,12 @@ public:
      * @return true si le portefeuille doit etre reequilibre.
      */
     virtual bool should_rebalance(int calendar_days_since_last_rebalance) = 0;
+
+    /**
+     * Determine si un reequilibrage doit avoir lieu quand un nouveau symbole apparait.
+     * @return true si l'apparition d'un nouveau symbole declenche un reequilibrage.
+     */
+    virtual bool should_rebalance_on_new_symbol() = 0;
 };
 
 #endif

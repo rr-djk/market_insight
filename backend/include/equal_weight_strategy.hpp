@@ -21,6 +21,12 @@ public:
         return calendar_days_since_last_rebalance >= rebalance_period_days;
     }
 
+    /**
+     * Les nouveaux symboles sont integres au prochain reequilibrage periodique.
+     * @return Toujours false.
+     */
+    bool should_rebalance_on_new_symbol() override { return false; }
+
 private:
     int rebalance_period_days;
 };
