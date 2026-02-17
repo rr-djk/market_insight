@@ -15,6 +15,6 @@ const std::vector<Price>& MarketData::get_prices(const std::string& symbol) cons
     return data.at(symbol);
 }
 
-std::vector<std::string> MarketData::get_supported_symbols(Database& db) {
+const std::vector<std::string> MarketData::get_supported_symbols(Database& db) {
     return db.get_symbols();
 }
