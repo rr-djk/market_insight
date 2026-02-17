@@ -5,6 +5,7 @@
 #include <vector>
 #include "backtest_result.hpp"
 #include "market_data.hpp"
+#include "portfolio.hpp"
 #include "strategy.hpp"
 
 class Backtest {
