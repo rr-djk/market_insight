@@ -13,9 +13,13 @@ public:
      * Charge les prix historiques depuis la base de donnees pour les symboles donnes.
      * @param db Connexion a la base de donnees PostgreSQL.
      * @param symbols Liste des tickers a charger (ex: {"AAPL", "MSFT"}).
+     * @param start_date Date de debut au format "YYYY-MM-DD". Vide pour pas de borne inferieure.
+     * @param end_date Date de fin au format "YYYY-MM-DD". Vide pour pas de borne superieure.
      */
     MarketData(Database& db,
-               const std::vector<std::string>& symbols);
+               const std::vector<std::string>& symbols,
+               const std::string& start_date = "",
+               const std::string& end_date = "");
 
     /**
      * Cree un contexte de marche a partir de donnees brutes (sans base de donnees).
