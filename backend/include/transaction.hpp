@@ -9,7 +9,7 @@ struct Transaction {
     std::string date;
     std::string symbol;
     OrderType order_type;
-    int quantity;
+    unsigned int quantity;
     double unit_price;
 };
 

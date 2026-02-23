@@ -12,7 +12,7 @@ struct UserInstruction {
     double                   initial_cash;      // Capital de depart
     std::string              start_date;        // Date de debut au format "YYYY-MM-DD".
     std::string              end_date;          // Date de fin au format "YYYY-MM-DD".
-    int                      rebalance_period_days; // Periode de reequilibrage Gave (ex: 30 ou 90 jours).
+    unsigned int             rebalance_period_days; // Periode de reequilibrage Gave (ex: 30 ou 90 jours).
 };
 
 #endif

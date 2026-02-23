@@ -11,7 +11,7 @@ struct BacktestResult {
     double total_return_pct;         // Rendement total en pourcentage.
     double annualized_return_pct;    // Rendement annualise en pourcentage.
     double max_drawdown_pct;         // Drawdown maximum en pourcentage.
-    double total_rebalances;
+    unsigned int total_rebalances;   // Nombre de reequilibrages effectues.
     std::vector<double> daily_portfolio_values;  // Valeur du portefeuille a chaque jour simule.
 };
 

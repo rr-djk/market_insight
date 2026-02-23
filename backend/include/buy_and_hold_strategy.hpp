@@ -10,7 +10,7 @@ public:
      * @param calendar_days_since_last_rebalance Ignore.
      * @return Toujours false.
      */
-    bool should_rebalance(int /*calendar_days_since_last_rebalance*/) override {
+    bool should_rebalance(unsigned int /*calendar_days_since_last_rebalance*/) override {
         return false;
     }
 

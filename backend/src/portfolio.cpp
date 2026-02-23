@@ -3,7 +3,7 @@
 Portfolio::Portfolio(double initial_cash)
   : initial_cash(initial_cash), available_cash(initial_cash) {}
 
-  bool Portfolio::buy_stock(const std::string& symbol, int quantity,
+  bool Portfolio::buy_stock(const std::string& symbol, unsigned int quantity,
                             double unit_price, const std::string& date) {
     double total_cost = quantity * unit_price;
     if (total_cost > available_cash) return false;
@@ -14,7 +14,7 @@ Portfolio::Portfolio(double initial_cash)
     return true;
   }
 
-bool Portfolio::sell_stock(const std::string& symbol, int quantity,
+bool Portfolio::sell_stock(const std::string& symbol, unsigned int quantity,
                            double unit_price, const std::string& date) {
   auto it = stock_positions.find(symbol);
   if (it == stock_positions.end() || it->second < quantity) return false;
@@ -45,7 +45,7 @@ double Portfolio::get_available_cash() const {
   return available_cash;
 }
 
-const std::unordered_map<std::string, int>& Portfolio::get_stock_positions() const {
+const std::unordered_map<std::string, unsigned int>& Portfolio::get_stock_positions() const {
   return stock_positions;
 }
 

@@ -23,7 +23,7 @@ public:
      * @param date Date de la transaction au format "YYYY-MM-DD".
      * @return true si l'achat a ete execute, false si cash insuffisant.
      */
-    bool buy_stock(const std::string& symbol, int quantity,
+    bool buy_stock(const std::string& symbol, unsigned int quantity,
                    double unit_price, const std::string& date);
 
     /**
@@ -34,7 +34,7 @@ public:
      * @param date Date de la transaction au format "YYYY-MM-DD".
      * @return true si la vente a ete executee, false si pas assez d'actions detenues.
      */
-    bool sell_stock(const std::string& symbol, int quantity,
+    bool sell_stock(const std::string& symbol, unsigned int quantity,
                     double unit_price, const std::string& date);
 
     /**
@@ -46,13 +46,13 @@ public:
 
     double get_initial_cash() const;
     double get_available_cash() const;
-    const std::unordered_map<std::string, int>& get_stock_positions() const;
+    const std::unordered_map<std::string, unsigned int>& get_stock_positions() const;
     const std::vector<Transaction>& get_transaction_history() const;
 
 private:
     double initial_cash;
     double available_cash;
-    std::unordered_map<std::string, int> stock_positions;
+    std::unordered_map<std::string, unsigned int> stock_positions;
     std::vector<Transaction> transaction_history;
 };
 

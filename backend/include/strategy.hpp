@@ -10,7 +10,7 @@ public:
      * @param calendar_days_since_last_rebalance Nombre de jours calendaires depuis le dernier reequilibrage.
      * @return true si le portefeuille doit etre reequilibre.
      */
-    virtual bool should_rebalance(int calendar_days_since_last_rebalance) = 0;
+    virtual bool should_rebalance(unsigned int calendar_days_since_last_rebalance) = 0;
 
     /**
      * Determine si un reequilibrage doit avoir lieu quand un nouveau symbole apparait.
