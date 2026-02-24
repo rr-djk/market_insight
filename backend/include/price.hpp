@@ -1,15 +1,16 @@
 #ifndef PRICE_HPP
 #define PRICE_HPP
 
-#include <string>
+#include "date.hpp"
 
+/// Prix journalier d'un symbole boursier.
 struct Price {
-    std::string date;
+    Date   date;
     double open;
     double high;
     double low;
     double close;
-    long volume;
+    long   volume;
 };
 
 #endif

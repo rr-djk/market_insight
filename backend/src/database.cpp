@@ -89,14 +89,17 @@ std::vector<Price> Database::get_prices(const std::string& symbol,
 
     // Pas de vérification de NULL : le schéma SQL impose NOT NULL sur toutes les colonnes
     for (const auto& row : result) {
-      prices.push_back({
-          row[0].as<std::string>(),
-          row[1].as<double>(),
-          row[2].as<double>(),
-          row[3].as<double>(),
-          row[4].as<double>(),
-          row[5].as<long>()
-          });
+        auto date = parse_date(row[0].as<std::string>());
+        if (!date) continue;
+
+        prices.push_back({
+            *date,
+            row[1].as<double>(),
+            row[2].as<double>(),
+            row[3].as<double>(),
+            row[4].as<double>(),
+            row[5].as<long>()
+        });
     }
 
     return prices;
