@@ -19,6 +19,13 @@ public:
      * @return Toujours true.
      */
     bool should_rebalance_on_new_symbol() override { return true; }
+
+    /**
+     * Pas d'iteration periodique : le moteur evalue chaque jour pour suivre
+     * les valeurs et detecter l'apparition de nouveaux symboles.
+     * @return 1 jour.
+     */
+    unsigned int get_period_days() const override { return 1u; }
 };
 
 #endif

@@ -17,6 +17,13 @@ public:
      * @return true si l'apparition d'un nouveau symbole declenche un reequilibrage.
      */
     virtual bool should_rebalance_on_new_symbol() = 0;
+
+    /**
+     * Retourne la periode d'iteration du moteur de backtest en jours calendaires.
+     * Determine le pas utilise pour avancer dans le temps entre deux evaluations.
+     * @return Nombre de jours entre deux evaluations.
+     */
+    virtual unsigned int get_period_days() const = 0;
 };
 
 #endif

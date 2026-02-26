@@ -27,6 +27,12 @@ public:
      */
     bool should_rebalance_on_new_symbol() override { return false; }
 
+    /**
+     * Retourne la periode de reequilibrage configuree.
+     * @return Nombre de jours entre deux evaluations du moteur.
+     */
+    unsigned int get_period_days() const override { return rebalance_period_days; }
+
 private:
     unsigned int rebalance_period_days;
 };
