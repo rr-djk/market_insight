@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -std=c++20 -Wall -Wextra -Wpedantic -I/usr/local/include -Iinclude \
+CXXFLAGS = -std=c++23 -Wall -Wextra -Wpedantic -I/usr/local/include -Iinclude \
 		   -Wshadow -Wconversion -Wsign-conversion -Wformat=2 -Wduplicated-branches \
 		   -Wduplicated-cond -Wnull-dereference
 
