@@ -1,6 +1,7 @@
 #include <iostream>
 #include <iomanip>
 #include <sstream>
+#include <print>
 #include "database.hpp"
 #include "date.hpp"
 #include "user_instruction.hpp"
@@ -12,44 +13,43 @@
 
 static void print_result(const std::string& label, const BacktestResult& result)
 {
-    std::cout << "\n--- " << label << " ---\n";
-    std::cout << std::fixed << std::setprecision(2);
-    std::cout << "  Valeur finale       : " << result.final_value << " $\n";
-    std::cout << "  Rendement total     : " << result.total_return_pct << " %\n";
-    std::cout << "  Rendement annualise : " << result.annualized_return_pct << " %\n";
-    std::cout << "  Drawdown maximum    : " << result.max_drawdown_pct << " %\n";
-    std::cout << "  Reequilibrages      : " << result.total_rebalances << "\n";
+    std::println("\n--- {} ---", label);
+    std::println("  Valeur finale       : {:.2f} $", result.final_value);
+    std::println("  Rendement total     : {:.2f} %", result.total_return_pct);
+    std::println("  Rendement annualise : {:.2f} %", result.annualized_return_pct);
+    std::println("  Drawdown maximum    : {:.2f} %", result.max_drawdown_pct);
+    std::println("  Reequilibrages      : {}", result.total_rebalances);
 }
 
 static UserInstruction read_user_instruction()
 {
     UserInstruction instruction{};
 
-    std::cout << "Symboles (separes par des espaces, ex: AAPL MSFT GOOGL) : ";
+    std::print("Symboles (separes par des espaces, ex: AAPL MSFT GOOGL) : ");
     std::string symbols_line;
     std::getline(std::cin, symbols_line);
     std::istringstream iss(symbols_line);
     std::string symbol;
     while (iss >> symbol) instruction.symbols.push_back(symbol);
 
-    std::cout << "Capital initial ($) : ";
+    std::print("Capital initial ($) : ");
     std::cin >> instruction.initial_cash;
 
     std::string start_str, end_str;
-    std::cout << "Date la plus lointaine est 1970-01-02" << std::endl;
-    std::cout << "Date de debut (YYYY-MM-DD) : ";
+    std::println("Date la plus lointaine est 1970-01-02");
+    std::print("Date de debut (YYYY-MM-DD) : ");
     std::cin >> start_str;
     auto start = parse_date(start_str);
     if (!start) throw std::invalid_argument("Date de debut invalide : " + start_str);
     instruction.start_date = *start;
 
-    std::cout << "Date de fin (YYYY-MM-DD) : ";
+    std::print("Date de fin (YYYY-MM-DD) : ");
     std::cin >> end_str;
     auto end = parse_date(end_str);
     if (!end) throw std::invalid_argument("Date de fin invalide : " + end_str);
     instruction.end_date = *end;
 
-    std::cout << "Periode de reequilibrage Gave (jours, ex: 30 90 365) : ";
+    std::print("Periode de reequilibrage Gave (jours, ex: 30 90 365) : ");
     std::cin >> instruction.rebalance_period_days;
 
     return instruction;
@@ -75,28 +75,31 @@ int main()
         Portfolio bah_portfolio(instruction.initial_cash);
         BacktestResult bah_result = backtest.execute_backtest(bah_portfolio, bah_strategy);
 
-        std::cout << "\nSymboles : ";
+        std::print("\nSymboles : ");
         for (size_t i = 0; i < instruction.symbols.size(); ++i) {
-            if (i > 0) std::cout << ", ";
-            std::cout << instruction.symbols[i];
+            if (i > 0) std::print(", ");
+            std::print("{}", instruction.symbols[i]);
         }
-        std::cout << "\n";
-        std::cout << "Periode  : " << format_date(instruction.start_date)
-                  << " -> " << format_date(instruction.end_date) << "\n";
-        std::cout << std::fixed << std::setprecision(2);
-        std::cout << "Capital  : " << instruction.initial_cash << " $\n";
-        std::cout << "Reequilibrage Gave : tous les "
-                  << instruction.rebalance_period_days << " jours\n";
+        std::println("");
+
+        std::println("Periode  : {} -> {}",
+                     format_date(instruction.start_date),
+                     format_date(instruction.end_date));
+
+        std::println("Capital  : {:.2f} $", instruction.initial_cash);
+
+        std::println("Reequilibrage Gave : tous les {} jours",
+                     instruction.rebalance_period_days);
 
         print_result("Gave - Equiponderation", gave_result);
         print_result("Buy & Hold", bah_result);
 
         double surperf = gave_result.total_return_pct - bah_result.total_return_pct;
-        std::cout << "\nSurperformance Gave vs B&H : "
-                  << std::showpos << surperf << std::noshowpos << " points\n";
+
+        std::println("\nSurperformance Gave vs B&H : {:+.2f} points", surperf);
 
     } catch (const std::exception& e) {
-        std::cerr << "Erreur : " << e.what() << "\n";
+        std::println(stderr, "Erreur : {}", e.what());
         return 1;
     }
 
