@@ -1,0 +1,13 @@
+# Suppressions pour les faux positifs valgrind dans les bibliothèques système.
+# La fuite dans libp11-kit se produit lors de l'initialisation du linker dynamique
+# (_dl_init → newlocale) et est indépendante du code applicatif.
+
+{
+   libp11kit_newlocale_leak
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:realloc
+   fun:argz_add_sep
+   fun:newlocale
+   obj:*/libp11-kit.so*
+}
