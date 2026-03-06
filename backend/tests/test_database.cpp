@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "database.hpp"
+#include "date.hpp"
 
 // =============================================================================
 // Tests d'integration - necessitent PostgreSQL lance (docker-compose up)
@@ -69,9 +70,11 @@ TEST_F(DatabaseTest, GetPricesPositiveValues) {
 
 TEST_F(DatabaseTest, GetPricesDateFilter) {
     auto prices = db->get_prices("AAPL", "2024-06-01", "2024-06-30");
+    Date start = *parse_date("2024-06-01");
+    Date end   = *parse_date("2024-06-30");
     for (const auto& p : prices) {
-        EXPECT_GE(p.date, "2024-06-01");
-        EXPECT_LE(p.date, "2024-06-30");
+        EXPECT_GE(p.date, start);
+        EXPECT_LE(p.date, end);
     }
 }
 

@@ -28,6 +28,19 @@ static MarketData make_dual_market(const std::string& symbol_a,
     return MarketData(data);
 }
 
+static MarketData make_triple_market(const std::string& sym_a,
+                                     const std::vector<Price>& pa,
+                                     const std::string& sym_b,
+                                     const std::vector<Price>& pb,
+                                     const std::string& sym_c,
+                                     const std::vector<Price>& pc) {
+    std::map<std::string, std::vector<Price>> data;
+    data[sym_a] = pa;
+    data[sym_b] = pb;
+    data[sym_c] = pc;
+    return MarketData(data);
+}
+
 // =============================================================================
 // BuyAndHoldStrategy
 // =============================================================================
@@ -262,4 +275,193 @@ TEST(BacktestTest, AnnualizedReturnOverOneYear) {
     // 365 jours → rendement annualise ≈ 10%
     EXPECT_DOUBLE_EQ(result.final_value, 11000.0);
     EXPECT_NEAR(result.annualized_return_pct, 10.0, 0.5);
+}
+
+// =============================================================================
+// Symboles en attente (pending)
+// =============================================================================
+
+TEST(PendingSymbolTest, BuyAndHoldRebalancesOnNewSymbol) {
+    // B n'a pas de donnees au premier jour : il est mis en attente.
+    // Quand il apparait au jour 1, BuyAndHold declenche un reequilibrage immediat.
+    BuyAndHoldStrategy strategy;
+
+    std::vector<Price> prices_a = {
+        make_price("2024-01-01", 100.0),
+        make_price("2024-01-02", 100.0),
+        make_price("2024-01-03", 100.0)
+    };
+    std::vector<Price> prices_b = {
+        // Pas de prix au 2024-01-01 : B demarre en attente.
+        make_price("2024-01-02", 100.0),
+        make_price("2024-01-03", 100.0)
+    };
+
+    MarketData market = make_dual_market("A", prices_a, "B", prices_b);
+    Backtest bt(market, {"A", "B"});
+    Portfolio portfolio(10000.0);
+
+    auto result = bt.execute_backtest(portfolio, strategy);
+
+    // Jour 0 : seulement A disponible, achat 100 A a 100. Cash = 0.
+    // Jour 1 : B apparait → B&H reequilibre.
+    //   Vente 100 A a 100 = 10000. Achat 50 A + 50 B a 100 = 10000. Cash = 0.
+    // Final (jour 2) : 50*100 + 50*100 = 10000. Aucun reequilibrage supplementaire.
+    EXPECT_DOUBLE_EQ(result.final_value, 10000.0);
+    EXPECT_EQ(result.total_rebalances, 1u);
+}
+
+TEST(PendingSymbolTest, EqualWeightIgnoresNewSymbolTrigger) {
+    // B n'a pas de donnees au premier jour : il est mis en attente.
+    // EqualWeight ne reequilibre pas a l'apparition d'un nouveau symbole.
+    // La periode de 90 jours n'est jamais atteinte → aucun reequilibrage,
+    // B n'est jamais achete.
+    EqualWeightStrategy strategy(90u);
+
+    std::vector<Price> prices_a = {
+        make_price("2024-01-01", 100.0),
+        make_price("2024-01-16", 100.0),
+        make_price("2024-01-31", 100.0)
+    };
+    std::vector<Price> prices_b = {
+        // Pas de prix au 2024-01-01 : B demarre en attente.
+        make_price("2024-01-16", 100.0),
+        make_price("2024-01-31", 100.0)
+    };
+
+    MarketData market = make_dual_market("A", prices_a, "B", prices_b);
+    Backtest bt(market, {"A", "B"});
+    Portfolio portfolio(10000.0);
+
+    auto result = bt.execute_backtest(portfolio, strategy);
+
+    // Jour 0 : 100 A a 100. Cash = 0.
+    // Pas de boucle (period=90 > duree sim=30 jours).
+    // B resolu au snapshot final mais n'est jamais achete (aucun reequilibrage).
+    // Valeur finale : 100 * 100 = 10000.
+    EXPECT_DOUBLE_EQ(result.final_value, 10000.0);
+    EXPECT_EQ(result.total_rebalances, 0u);
+}
+
+// =============================================================================
+// Prix manquants (trous dans les donnees)
+// =============================================================================
+
+TEST(BacktestTest, PriceGap_LastKnownPriceUsed) {
+    // Un symbole sans cotation a une date intermediaire.
+    // Le moteur doit utiliser le dernier prix connu (find_price_at_or_before).
+    BuyAndHoldStrategy strategy;
+
+    std::vector<Price> prices = {
+        make_price("2024-01-01", 100.0),
+        // Pas de prix au 2024-01-02.
+        make_price("2024-01-03", 120.0)
+    };
+
+    MarketData market = make_single_market("AAPL", prices);
+    Backtest bt(market, {"AAPL"});
+    Portfolio portfolio(10000.0);
+
+    auto result = bt.execute_backtest(portfolio, strategy);
+
+    // Jour 0 : 100 actions a 100. Cash = 0. Valeur = 10000.
+    // Jour 1 (2024-01-02) : pas de prix → dernier connu = 100. Valeur = 10000.
+    // Final (2024-01-03) : prix = 120. Valeur = 100 * 120 = 12000.
+    ASSERT_EQ(result.daily_portfolio_values.size(), 3u);
+    EXPECT_DOUBLE_EQ(result.daily_portfolio_values[1], 10000.0);
+    EXPECT_DOUBLE_EQ(result.final_value, 12000.0);
+}
+
+// =============================================================================
+// Trois symboles
+// =============================================================================
+
+TEST(BacktestTest, ThreeSymbols_EqualDistributionWithResidualCash) {
+    // Avec 10000 repartis sur 3 symboles a 100 : 33 actions chacun = 9900.
+    // Le cash residuel (100) reste en portefeuille et est compte dans la valeur.
+    BuyAndHoldStrategy strategy;
+
+    std::vector<Price> prices = {
+        make_price("2024-01-01", 100.0),
+        make_price("2024-01-02", 100.0)
+    };
+
+    MarketData market = make_triple_market("A", prices, "B", prices, "C", prices);
+    Backtest bt(market, {"A", "B", "C"});
+    Portfolio portfolio(10000.0);
+
+    auto result = bt.execute_backtest(portfolio, strategy);
+
+    // 10000 / 3 = 3333.33 par symbole. floor(3333.33 / 100) = 33 actions chacun.
+    // Cout total : 33 * 100 * 3 = 9900. Cash residuel = 100.
+    // Valeur = 9900 + 100 = 10000.
+    EXPECT_DOUBLE_EQ(result.final_value, 10000.0);
+    EXPECT_DOUBLE_EQ(result.total_return_pct, 0.0);
+    EXPECT_EQ(result.total_rebalances, 0u);
+}
+
+TEST(BacktestTest, ThreeSymbols_RebalanceWithResidualCash) {
+    // Reequilibrage sur 3 symboles avec prix divergents, puis A continue de monter.
+    // Le cash residuel des arrondis (100) est conserve a travers le reequilibrage.
+    EqualWeightStrategy strategy(30u);
+
+    std::vector<Price> prices_a = {
+        make_price("2024-01-01", 100.0),
+        make_price("2024-01-31", 150.0),
+        make_price("2024-02-01", 200.0)
+    };
+    std::vector<Price> prices_b = {
+        make_price("2024-01-01", 100.0),
+        make_price("2024-01-31", 100.0),
+        make_price("2024-02-01", 100.0)
+    };
+    std::vector<Price> prices_c = {
+        make_price("2024-01-01", 100.0),
+        make_price("2024-01-31",  50.0),
+        make_price("2024-02-01",  50.0)
+    };
+
+    MarketData market = make_triple_market("A", prices_a, "B", prices_b, "C", prices_c);
+    Backtest bt(market, {"A", "B", "C"});
+    Portfolio portfolio(10000.0);
+
+    auto result = bt.execute_backtest(portfolio, strategy);
+
+    // Jour 0 : 33 A (3300) + 33 B (3300) + 33 C (3300) + 100 cash = 10000.
+    // Jour 30 (2024-01-31) : reequilibrage.
+    //   Vente : 33*150 + 33*100 + 33*50 + 100 cash = 10000.
+    //   Achat : floor(3333.33/150)=22 A + floor(3333.33/100)=33 B + floor(3333.33/50)=66 C.
+    //   Cout : 3300+3300+3300 = 9900. Cash residuel = 100. Rebalances = 1.
+    // Final (2024-02-01) : 22*200 + 33*100 + 66*50 + 100 = 4400+3300+3300+100 = 11100.
+    EXPECT_EQ(result.total_rebalances, 1u);
+    EXPECT_DOUBLE_EQ(result.final_value, 11100.0);
+}
+
+// =============================================================================
+// Cas limites
+// =============================================================================
+
+TEST(BacktestTest, SingleDate_LoopNeverRuns_ValuePreserved) {
+    // Un seul prix par symbole : start_date = end_date.
+    // La boucle de simulation ne s'execute pas.
+    // La valeur finale est identique a la valeur initiale.
+    BuyAndHoldStrategy strategy;
+
+    std::vector<Price> prices = {
+        make_price("2024-01-01", 100.0)
+    };
+
+    MarketData market = make_single_market("AAPL", prices);
+    Backtest bt(market, {"AAPL"});
+    Portfolio portfolio(10000.0);
+
+    auto result = bt.execute_backtest(portfolio, strategy);
+
+    // start = end = 2024-01-01. Achat 100 actions a 100.
+    // Boucle : 2024-01-02 < 2024-01-01 → faux, aucune iteration.
+    // Snapshot final a 2024-01-01 : valeur = 100 * 100 = 10000.
+    // daily_portfolio_values = [valeur_initiale, snapshot_final] → taille 2.
+    EXPECT_EQ(result.total_rebalances, 0u);
+    EXPECT_DOUBLE_EQ(result.final_value, 10000.0);
+    ASSERT_EQ(result.daily_portfolio_values.size(), 2u);
 }
