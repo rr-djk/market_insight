@@ -129,8 +129,11 @@ static void sell_all_positions(Portfolio& portfolio,
                                const std::unordered_map<std::string, double>& current_prices,
                                Date date)
 {
+    // Copie intentionnelle : sell_stock efface des entrees de la map originale,
+    // ce qui invaliderait les iterateurs si on iterait sur la reference directement.
+    auto positions = portfolio.get_stock_positions();
     std::string date_str = format_date(date);
-    for (const auto& [symbol, qty] : portfolio.get_stock_positions()) {
+    for (const auto& [symbol, qty] : positions) {
         if (qty > 0) {
             portfolio.sell_stock(symbol, qty, current_prices.at(symbol), date_str);
         }
@@ -204,6 +207,7 @@ BacktestResult Backtest::execute_backtest(Portfolio& portfolio, Strategy& strate
 
     auto [start_date, end_date] = *date_range;
     unsigned int period_days = strategy.get_period_days();
+    if (period_days == 0) return result;
 
     double peak_value  = initial_value;
     double max_drawdown = 0.0;
