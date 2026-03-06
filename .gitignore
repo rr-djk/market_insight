@@ -23,3 +23,10 @@ backend/build/
 # Logs
 logs/
 *.log
+
+# Cache clangd
+backend/.cache/
+
+# Editeur
+.clangd
+compile_commands.json
