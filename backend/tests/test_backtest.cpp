@@ -438,6 +438,79 @@ TEST(BacktestTest, ThreeSymbols_RebalanceWithResidualCash) {
 }
 
 // =============================================================================
+// Délisting
+// =============================================================================
+
+TEST(DelistingTest, DelistedSymbolSoldAndExcluded) {
+    // B cesse de coter apres le jour 1 (2024-01-02).
+    // Au pas suivant (2024-01-03), le moteur doit vendre B au dernier prix connu
+    // et l'exclure definitivement de la simulation.
+    // Le cash recupere reste en portefeuille jusqu'au prochain reequilibrage.
+    BuyAndHoldStrategy strategy;
+
+    std::vector<Price> prices_a = {
+        make_price("2024-01-01", 100.0),
+        make_price("2024-01-02", 100.0),
+        make_price("2024-01-03", 100.0),
+        make_price("2024-01-04", 100.0)
+    };
+    std::vector<Price> prices_b = {
+        make_price("2024-01-01", 100.0),
+        make_price("2024-01-02", 200.0)   // derniere cotation : B radi apres ce jour
+    };
+
+    MarketData market = make_dual_market("A", prices_a, "B", prices_b);
+    Backtest bt(market, {"A", "B"});
+    Portfolio portfolio(10000.0);
+
+    auto result = bt.execute_backtest(portfolio, strategy);
+
+    // Jour 0 (2024-01-01) : 50 A @ 100 + 50 B @ 100 = 10000. Cash = 0.
+    // Pas 1 (2024-01-02) : pas de delisting (2024-01-02 < 2024-01-02 est faux).
+    //   Valeur = 50*100 + 50*200 = 15000.
+    // Pas 2 (2024-01-03) : B.back().date = 2024-01-02 < 2024-01-03 → radi.
+    //   Vente 50 B @ 200 = 10000 cash. B retire de available.
+    //   Valeur = 50*100 + 10000 = 15000.
+    // Pas 3 (2024-01-04) : uniquement A en portefeuille.
+    //   Valeur = 50*100 + 10000 = 15000.
+    // Snapshot final (2024-01-04) : valeur = 15000.
+    EXPECT_DOUBLE_EQ(result.final_value, 15000.0);
+    EXPECT_DOUBLE_EQ(result.total_return_pct, 50.0);
+    EXPECT_EQ(result.total_rebalances, 0u);
+}
+
+TEST(DelistingTest, CashRedistributedAtNextRebalance) {
+    // B cesse de coter a mi-simulation. Le cash recupere est redistribue
+    // au prochain reequilibrage periodique sur A uniquement.
+    EqualWeightStrategy strategy(30u);
+
+    std::vector<Price> prices_a = {
+        make_price("2024-01-01", 100.0),
+        make_price("2024-01-31", 100.0),  // reequilibrage (30 jours)
+        make_price("2024-03-01", 200.0)   // fin de simulation
+    };
+    std::vector<Price> prices_b = {
+        make_price("2024-01-01", 100.0),
+        make_price("2024-01-15", 100.0)   // derniere cotation : radi avant le reequilibrage
+    };
+
+    MarketData market = make_dual_market("A", prices_a, "B", prices_b);
+    Backtest bt(market, {"A", "B"});
+    Portfolio portfolio(10000.0);
+
+    auto result = bt.execute_backtest(portfolio, strategy);
+
+    // Jour 0 (2024-01-01) : 50 A @ 100 + 50 B @ 100. Cash = 0.
+    // Pas 1 (2024-01-31, +30j) : B.back() = 2024-01-15 < 2024-01-31 → radi.
+    //   Vente 50 B @ 100 = 5000 cash. Cash total = 5000.
+    //   Reequilibrage sur A uniquement : vente 50 A @ 100 = 10000 cash.
+    //   Achat : floor(10000 / 100) = 100 A @ 100 = 10000. Cash = 0. Rebalances = 1.
+    // Snapshot final (2024-03-01) : 100 * 200 = 20000.
+    EXPECT_EQ(result.total_rebalances, 1u);
+    EXPECT_DOUBLE_EQ(result.final_value, 20000.0);
+}
+
+// =============================================================================
 // Cas limites
 // =============================================================================
 

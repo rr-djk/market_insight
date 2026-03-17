@@ -325,6 +325,43 @@ static void record_daily_value(Portfolio& portfolio,
 }
 
 /**
+ * Detecte les symboles radies et liquide leurs positions au dernier prix connu.
+ * Un symbole est considere radi si sa derniere cotation est anterieure a current_date.
+ * La position est vendue a la date de la derniere cotation du symbole.
+ * Le cash recupere reste en portefeuille et sera redistribue au prochain reequilibrage.
+ * @param available Symboles actifs (les radies sont retires en place).
+ * @param portfolio Portefeuille dont les positions radiees seront liquidees.
+ * @param market Donnees de marche.
+ * @param current_date Date courante de la simulation.
+ * @return true si au moins un symbole a ete radi et sa position liquidee.
+ */
+static bool detect_and_process_delistings(std::vector<std::string>& available,
+                                           Portfolio& portfolio,
+                                           const MarketData& market,
+                                           Date current_date)
+{
+    bool any_delisted = false;
+    std::vector<std::string> still_active;
+
+    for (const auto& symbol : available) {
+        const auto& prices = market.get_prices(symbol);
+        if (!prices.empty() && prices.back().date < current_date) {
+            const Price& last = prices.back();
+            auto positions = portfolio.get_stock_positions();
+            auto it = positions.find(symbol);
+            if (it != positions.end() && it->second > 0)
+                portfolio.sell_stock(symbol, it->second, last.close, format_date(last.date));
+            any_delisted = true;
+        } else {
+            still_active.push_back(symbol);
+        }
+    }
+
+    available = std::move(still_active);
+    return any_delisted;
+}
+
+/**
  * Execute la boucle principale de simulation entre start_date et end_date.
  * Avance par pas de strategy.get_period_days(), resout les symboles en attente,
  * declenche les reequilibrages si necessaire, et enregistre la valeur a chaque pas.
@@ -360,6 +397,8 @@ static void run_simulation_loop(Portfolio& portfolio,
     Date current_date = start_date + std::chrono::days(period_days);
 
     while (current_date < end_date) {
+        detect_and_process_delistings(available, portfolio, market, current_date);
+
         bool new_symbols = !pending.empty() &&
             resolve_pending_symbols(pending, available, market, current_date);
 
