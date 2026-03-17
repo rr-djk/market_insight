@@ -1,0 +1,31 @@
+name: Valgrind
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - '**.hpp'
+      - '**.cpp'
+
+jobs:
+  valgrind:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y valgrind g++-14 libpq-dev libpqxx-dev \
+            libgtest-dev cmake
+
+      - name: Build Google Test
+        run: |
+          cd /usr/src/googletest
+          sudo cmake .
+          sudo make
+          sudo cp lib/*.a /usr/local/lib/
+
+      - name: Build and run valgrind
+        working-directory: backend
+        run: make valgrind
