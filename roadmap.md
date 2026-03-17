@@ -86,11 +86,14 @@ Sortie attendue (chaque ligne des 33M reçoit ses features) :
 - [x] 13 tests unitaires (`test_technical_indicators.cpp`)
 - [x] `compute_all()` : batch runner sur tous les symboles, point d'entrée du profiling
 - [x] Menu CLI : choix entre backtest Gave et batch indicateurs
-- [x] **Baseline mesurée** : `compute_all()` = 3 057 ms, elapsed total = 64.87 s, CPU 59%, RAM 3.04 GB (voir `doc_apprentissage/profiling_report.md`)
-- [ ] **Profiling gprof** : identifier les fonctions qui consomment le plus de temps CPU
-- [ ] **Profiling perf** : identifier les cache misses, branch mispredictions
-- [ ] Optimisation basée sur les résultats (loop unrolling, layout mémoire)
-- [ ] Mesure avant/après : temps d'exécution et métriques CPU
+- [x] **Baseline mesurée** : `compute_all()` = 3 057 ms, elapsed total = 64.87 s, CPU 59%, RAM 3.04 GB
+- [x] **Profiling gprof** : les indicateurs < 3% du CPU — vrai goulot = désérialisation PostgreSQL (voir `backend/profiling/`)
+- [x] **Leçon** : `fill_n` et `push_back` testés, les deux plus lents — le compilateur vectorise mieux `result[i]` sur taille fixe (voir `backend/profiling/fails.md`)
+- [ ] **Optimisation chargement PostgreSQL** (à faire) :
+  - [ ] Requête bulk unique au lieu de 11 727 requêtes distinctes
+  - [ ] Stocker les dates comme entiers en DB pour éliminer `parse_date` × 33M
+  - [ ] Réduire l'overhead `shared_ptr` pqxx (COPY BINARY ou interface alternative)
+- [ ] **Profiling perf** : cache misses, branch mispredictions (après optimisation chargement)
 
 ---
 
