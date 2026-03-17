@@ -59,8 +59,8 @@ Chaque phase introduit une opération plus lourde sur les données, et un niveau
 Prérequis avant de passer aux opérations massives.
 
 - [x] **Refactoring `execute_backtest()`** : decompose en fonctions modulaires (classify_symbols_by_availability, run_initial_distribution, run_simulation_loop, capture_final_snapshot) — chaque fonction <30 lignes
-- [ ] **Délisting** : détecter quand un symbole a cessé de coter, vendre au dernier prix connu, exclure définitivement de la simulation, redistribuer le cash au prochain rééquilibrage
-- [ ] **Export CSV** : écriture des valeurs journalières dans un fichier pour graphe externe
+- [x] **Délisting** : détecter quand un symbole a cessé de coter, vendre au dernier prix connu, exclure définitivement de la simulation, redistribuer le cash au prochain rééquilibrage
+- [ ] **Export CSV** : écriture des valeurs journalières dans un fichier pour graphe externe (optionnel)
 
 ---
 
@@ -69,8 +69,24 @@ Prérequis avant de passer aux opérations massives.
 **Opération** : calculer RSI, MACD, moyennes mobiles et Bollinger Bands sur les 33M lignes.
 **Pourquoi** : première vraie charge CPU — boucles denses, arithmétique flottante, accès séquentiel à de gros volumes. Idéal pour apprendre à lire un profil gprof/perf.
 
-- [ ] Implémenter les indicateurs en C++ (`TechnicalIndicators`) : SMA, EMA, RSI, MACD, Bollinger
-- [ ] Calcul sur l'intégralité des symboles NASDAQ
+Sortie attendue (chaque ligne des 33M reçoit ses features) :
+
+```
+  symbol   date         close   sma_20  sma_50  rsi_14  macd    bollinger_upper  bollinger_lower
+  ──────────────────────────────────────────────────────────────────────────────────────────────
+  AAPL     2024-01-01   100.0     –       –       –       –          –                –
+  ...
+  AAPL     2024-01-20   104.0   102.3     –      58.2    0.45      106.1            98.5
+  AAPL     2024-01-21   103.5   102.8     –      54.1    0.31      105.9            99.7
+  ...
+  MSFT     2024-01-01   380.0     –       –       –       –          –                –
+```
+
+- [x] Implémenter les indicateurs en C++ : SMA, EMA, RSI, MACD, Bollinger (rolling O(n), NaN pour chauffe)
+- [x] 13 tests unitaires (`test_technical_indicators.cpp`)
+- [x] `compute_all()` : batch runner sur tous les symboles, point d'entrée du profiling
+- [x] Menu CLI : choix entre backtest Gave et batch indicateurs
+- [x] **Baseline mesurée** : `compute_all()` = 3 057 ms, elapsed total = 64.87 s, CPU 59%, RAM 3.04 GB (voir `doc_apprentissage/profiling_report.md`)
 - [ ] **Profiling gprof** : identifier les fonctions qui consomment le plus de temps CPU
 - [ ] **Profiling perf** : identifier les cache misses, branch mispredictions
 - [ ] Optimisation basée sur les résultats (loop unrolling, layout mémoire)
