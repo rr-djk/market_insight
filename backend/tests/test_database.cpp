@@ -98,7 +98,7 @@ TEST_F(DatabaseTest, GetPricesNoDatesReturnsAll) {
 // sans passer par parse_date().
 TEST(DateIntegerConversionTest, RoundTripIsExact) {
     Date expected = *parse_date("2024-01-15");
-    int  days_since_epoch = expected.time_since_epoch().count();
+    int  days_since_epoch = static_cast<int>(expected.time_since_epoch().count());
     Date reconstructed{std::chrono::days{days_since_epoch}};
     EXPECT_EQ(expected, reconstructed);
 }
