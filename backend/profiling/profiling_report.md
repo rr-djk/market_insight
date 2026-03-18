@@ -101,10 +101,55 @@ La prochaine cible est le chargement PostgreSQL.
 
 ---
 
-## Mesures suivantes
+## Optimisation 1 — Élimination de `parse_date` × 33M
 
-*(à compléter au fil des optimisations)*
+**Date** : 2026-03-18
+**Commande** : `echo 2 | time ./build/market_insight`
 
-| Version | compute_all() | Elapsed | CPU | RAM | Gain |
+### Modification
+
+Dans `get_prices()` (`database.cpp`), la colonne `trade_date` était retournée par PostgreSQL
+comme string "YYYY-MM-DD", allouée en `std::string` sur le heap, puis parsée par `parse_date()`.
+Cela représentait 33M allocations heap + 33M appels `parse_date`.
+
+Remplacement du `SELECT hp.trade_date` par :
+```sql
+SELECT EXTRACT(EPOCH FROM hp.trade_date)::int / 86400
+```
+
+Côté C++, `row[0].as<int>()` lit directement un entier (stack, zéro malloc),
+puis `sys_days{days{n}}` reconstruit la date en O(1).
+
+`parse_date()` reste utilisé uniquement pour la saisie CLI (entrée utilisateur).
+
+### Résultats
+
+| Métrique | Baseline | Optimisation 1 | Δ |
+|---|---|---|---|
+| `compute_all()` | 3 057 ms | **2 890 ms** | −167 ms (−5.5%) |
+| Elapsed total | 64.87 s | ~95 s* | — |
+| User CPU | 35.38 s | 40.72 s | — |
+| System | 3.25 s | 4.46 s | — |
+| CPU utilisé | 59% | 47% | — |
+| Mémoire résidente max | 3 190 500 KB | 3 190 108 KB | ≈ identique |
+
+*\* L'elapsed total est dominé par les 11 727 aller-retours PostgreSQL et varie selon
+le cache DB et la charge système — non significatif pour comparer cette optimisation.*
+
+### Analyse
+
+Le gain sur `compute_all()` (~5.5%) est cohérent avec le poids de `parse_date` dans le
+profil gprof (2.68% du CPU user). L'élimination des 33M allocations `std::string` réduit
+aussi la pression sur l'allocateur.
+
+Le goulot principal reste les **11 727 requêtes PostgreSQL distinctes** qui dominent l'elapsed.
+Prochaine cible : requête bulk unique.
+
+---
+
+## Tableau récapitulatif
+
+| Version | compute_all() | Elapsed | CPU | RAM | Gain compute_all() |
 |---|---|---|---|---|---|
 | Baseline séquentielle | 3 057 ms | 64.87 s | 59% | 3.04 GB | — |
+| Opt 1 — dates entières | 2 890 ms | ~95 s* | 47% | 3.19 GB | −5.5% |

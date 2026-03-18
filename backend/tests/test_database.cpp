@@ -88,3 +88,27 @@ TEST_F(DatabaseTest, GetPricesNoDatesReturnsAll) {
     auto jan_prices = db->get_prices("AAPL", "2024-01-01", "2024-01-31");
     EXPECT_GT(all_prices.size(), jan_prices.size());
 }
+
+// =============================================================================
+// Conversion entier → Date
+// =============================================================================
+
+// Valide que sys_days{days{n}} est l'inverse exact de time_since_epoch().count().
+// C'est la formule utilisée dans get_prices() pour décoder les dates PostgreSQL
+// sans passer par parse_date().
+TEST(DateIntegerConversionTest, RoundTripIsExact) {
+    Date expected = *parse_date("2024-01-15");
+    int  days_since_epoch = expected.time_since_epoch().count();
+    Date reconstructed{std::chrono::days{days_since_epoch}};
+    EXPECT_EQ(expected, reconstructed);
+}
+
+TEST(DateIntegerConversionTest, UnixEpochIsZero) {
+    Date epoch = *parse_date("1970-01-01");
+    EXPECT_EQ(epoch.time_since_epoch().count(), 0);
+}
+
+TEST(DateIntegerConversionTest, KnownDateHasPositiveCount) {
+    Date d = *parse_date("2000-01-01");
+    EXPECT_GT(d.time_since_epoch().count(), 0);
+}

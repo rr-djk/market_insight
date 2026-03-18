@@ -58,7 +58,8 @@ std::vector<Price> Database::get_prices(const std::string& symbol,
                                          const std::string& start_date,
                                          const std::string& end_date) {
     std::string query =
-        "SELECT hp.trade_date, hp.open, hp.high, hp.low, hp.close, hp.volume "
+        "SELECT EXTRACT(EPOCH FROM hp.trade_date)::int / 86400, "
+        "       hp.open, hp.high, hp.low, hp.close, hp.volume "
         "FROM historical_prices hp "
         "JOIN symbols s ON hp.symbol_id = s.symbol_id "
         "WHERE s.symbol = $1";
@@ -89,11 +90,10 @@ std::vector<Price> Database::get_prices(const std::string& symbol,
 
     // Pas de vérification de NULL : le schéma SQL impose NOT NULL sur toutes les colonnes
     for (const auto& row : result) {
-        auto date = parse_date(row[0].as<std::string>());
-        if (!date) continue;
+        Date date{std::chrono::days{row[0].as<int>()}};
 
         prices.push_back({
-            *date,
+            date,
             row[1].as<double>(),
             row[2].as<double>(),
             row[3].as<double>(),
