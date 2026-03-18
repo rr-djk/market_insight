@@ -9,17 +9,29 @@
 class DatabaseTest : public ::testing::Test {
 protected:
     static void SetUpTestSuite() {
-        db = std::make_unique<Database>("../.env");
+        try {
+            db = std::make_unique<Database>("../.env");
+        } catch (const std::exception&) {
+            db_unavailable = true;
+        }
     }
 
     static void TearDownTestSuite() {
         db.reset();
     }
 
+    void SetUp() override {
+        if (db_unavailable) {
+            GTEST_SKIP() << "PostgreSQL indisponible, tests d'integration ignores";
+        }
+    }
+
     static std::unique_ptr<Database> db;
+    static bool db_unavailable;
 };
 
 std::unique_ptr<Database> DatabaseTest::db = nullptr;
+bool DatabaseTest::db_unavailable = false;
 
 // =============================================================================
 // get_symbols
