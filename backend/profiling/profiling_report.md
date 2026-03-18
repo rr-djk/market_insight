@@ -196,6 +196,66 @@ vitesse/mémoire documenté, pas un bug.
 
 ---
 
+## Analyse gprof — Opt 2 (bulk query)
+
+**Fichier** : `profiling_gprof_opt2_bulk.txt`
+
+### Ce qui a disparu
+
+`parse_date` n'apparaît plus dans le profil — confirmation que l'Opt 1 a bien éliminé
+les 33M conversions de date. Ce n'était pas le sujet de cette optimisation, mais ça valide
+que le gain mesuré en Opt 1 est réel et durable.
+
+### L'overhead pqxx shared_ptr : toujours là, légèrement réduit en %
+
+Dans la baseline, les compteurs de référence pqxx (`_M_release`, `_M_add_ref_copy`)
+représentaient ~6.5% du CPU user. Ils sont à ~5% ici.
+
+Ce que ça veut dire concrètement : pqxx stocke ses résultats avec un mécanisme de
+"propriété partagée" (`shared_ptr`). Chaque fois qu'on lit un champ dans une ligne,
+pqxx incrémente puis décrémente un compteur pour savoir quand libérer la mémoire.
+Sur 33M lignes avec 6 colonnes chacune, ça fait ~200M lectures de champs → ~540M
+opérations sur ces compteurs. C'est du travail CPU pur qui ne fait rien d'utile pour
+notre calcul.
+
+La réduction en % s'explique par le fait que d'autres goulots sont devenus plus visibles
+(voir ci-dessous), pas parce que le shared_ptr est devenu moins coûteux en absolu.
+
+### Nouveau goulot dominant : la recherche dans la map par nom de symbole
+
+Le goulot le plus surprenant du profil est l'apparition massive de comparaisons de
+strings : `string::compare` monte à **4.78% du CPU** avec **761 millions d'appels**.
+
+D'où ça vient ? Notre structure de données principale est un
+`map<string, vector<Price>>` — une map qui associe chaque nom de symbole ("AAPL",
+"MSFT"...) à son historique de prix. Ce type de map est implémenté en C++ comme un
+**arbre binaire trié** : pour trouver un symbole, il faut traverser l'arbre en
+comparant des strings à chaque nœud.
+
+Avec 11 727 symboles dans l'arbre, chaque recherche nécessite environ
+**log₂(11 727) ≈ 14 comparaisons de strings**. Et on fait cette recherche :
+- Une fois par ligne lors de la construction de la map dans `get_prices_bulk`
+  (33.7M lignes × 14 comparaisons ≈ 472M)
+- Une fois par symbole lors des accès dans `compute_all()`
+
+Résultat : 761M comparaisons de strings dont la quasi-totalité ne sert qu'à
+"naviguer dans l'arbre" pour arriver au bon endroit.
+
+### Ce que ça nous indique pour la suite
+
+La solution directe : remplacer `map` par `unordered_map`. Au lieu de traverser un
+arbre avec des comparaisons, `unordered_map` calcule un **hash** du nom de symbole
+(une opération rapide et fixe) et accède directement à la bonne case mémoire. On passe
+de ~14 opérations par recherche à ~1. Sur 761M appels, le gain potentiel est significatif.
+
+| Goulot | Baseline | Opt 2 | Tendance |
+|---|---|---|---|
+| `parse_date` | 2.68% / 33.7M appels | **0%** | ✅ éliminé |
+| `shared_ptr` pqxx (total) | ~6.5% | ~5% | légère baisse |
+| `map<string>` comparaisons | non visible | **~15%** | 🔴 nouveau goulot |
+
+---
+
 ## Tableau récapitulatif
 
 | Version | compute_all() | Elapsed | CPU | RAM | Gain compute_all() |
