@@ -38,6 +38,18 @@ public:
                                   const std::string& start_date = "",
                                   const std::string& end_date = "");
 
+    /**
+     * Récupère les prix OHLCV de plusieurs symboles en une seule requête.
+     * @param symbols Liste de tickers à charger.
+     * @param start_date Date de début au format "YYYY-MM-DD". Vide pour pas de borne inférieure.
+     * @param end_date Date de fin au format "YYYY-MM-DD". Vide pour pas de borne supérieure.
+     * @return Map symbole → vecteur de Price trié par date croissante.
+     */
+    std::map<std::string, std::vector<Price>>
+    get_prices_bulk(const std::vector<std::string>& symbols,
+                    const std::string& start_date = "",
+                    const std::string& end_date = "");
+
 private:
     std::unique_ptr<pqxx::connection> conn;
 

@@ -147,9 +147,59 @@ Prochaine cible : requête bulk unique.
 
 ---
 
+---
+
+## Optimisation 2 — Requête bulk unique (ANY($1::text[]))
+
+**Date** : 2026-03-18
+**Commande** : `echo 2 | time ./build/market_insight`
+
+### Modification
+
+`MarketData` appelait `db.get_prices(symbol, ...)` dans une boucle, soit 11 727 aller-retours
+PostgreSQL distincts. Remplacement par une seule requête `get_prices_bulk` :
+
+```sql
+SELECT s.symbol,
+       EXTRACT(EPOCH FROM hp.trade_date)::int / 86400,
+       hp.open, hp.high, hp.low, hp.close, hp.volume
+FROM historical_prices hp
+JOIN symbols s ON hp.symbol_id = s.symbol_id
+WHERE s.symbol = ANY($1::text[])
+  AND hp.trade_date >= $2
+  AND hp.trade_date <= $3
+ORDER BY s.symbol, hp.trade_date
+```
+
+Côté C++, `MarketData` reçoit directement un `map<string, vector<Price>>` construit en une passe.
+
+### Résultats
+
+| Métrique | Opt 1 | Opt 2 (bulk) | Δ |
+|---|---|---|---|
+| `compute_all()` | 2 890 ms | **2 643 ms** | −247 ms (−8.5%) |
+| Elapsed total | ~95 s | **75.85 s** | −~19 s (−20%) |
+| User CPU | 40.72 s | 50.65 s | +9.93 s |
+| System | 4.46 s | 3.96 s | −0.5 s |
+| CPU % | 47% | **72%** | +25% |
+| Mémoire résidente max | ~3.04 GB | **7.57 GB** | **+4.5 GB** |
+
+### Analyse
+
+L'elapsed baisse de 20% : les 11 727 aller-retours réseau sont éliminés. Le CPU passe de 47%
+à 72% — le processus attend moins la DB et calcule davantage.
+
+**Régression mémoire** : la RAM double. La requête bulk charge les 33M lignes dans un seul
+`pqxx::result` qui coexiste en mémoire avec la map en cours de construction. Avant, chaque
+`pqxx::result` par symbole était libéré immédiatement après usage. C'est un trade-off
+vitesse/mémoire documenté, pas un bug.
+
+---
+
 ## Tableau récapitulatif
 
 | Version | compute_all() | Elapsed | CPU | RAM | Gain compute_all() |
 |---|---|---|---|---|---|
 | Baseline séquentielle | 3 057 ms | 64.87 s | 59% | 3.04 GB | — |
-| Opt 1 — dates entières | 2 890 ms | ~95 s* | 47% | 3.19 GB | −5.5% |
+| Opt 1 — dates entières | 2 890 ms | ~95 s* | 47% | 3.04 GB | −5.5% |
+| Opt 2 — bulk query | 2 643 ms | 75.85 s | 72% | 7.57 GB | −13.5% |

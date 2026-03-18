@@ -5,9 +5,7 @@ MarketData::MarketData(Database& db,
                        const std::vector<std::string>& symbols,
                        const std::string& start_date,
                        const std::string& end_date) {
-    for (const auto& symbol : symbols) {
-        data[symbol] = db.get_prices(symbol, start_date, end_date);
-    }
+    data = db.get_prices_bulk(symbols, start_date, end_date);
 }
 
 MarketData::MarketData(std::map<std::string, std::vector<Price>> raw_data)
