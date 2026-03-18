@@ -90,9 +90,10 @@ Sortie attendue (chaque ligne des 33M reçoit ses features) :
 - [x] **Profiling gprof** : les indicateurs < 3% du CPU — vrai goulot = désérialisation PostgreSQL (voir `backend/profiling/`)
 - [x] **Leçon** : `fill_n` et `push_back` testés, les deux plus lents — le compilateur vectorise mieux `result[i]` sur taille fixe (voir `backend/profiling/fails.md`)
 - [ ] **Optimisation chargement PostgreSQL** (à faire) :
-  - [ ] Requête bulk unique au lieu de 11 727 requêtes distinctes
-  - [ ] Stocker les dates comme entiers en DB pour éliminer `parse_date` × 33M
-  - [ ] Réduire l'overhead `shared_ptr` pqxx (COPY BINARY ou interface alternative)
+  - [x] Requête bulk unique au lieu de 11 727 requêtes distinctes
+  - [x] Stocker les dates comme entiers en DB pour éliminer `parse_date` × 33M
+  - [ ] Réduire l'overhead `shared_ptr` pqxx (COPY BINARY ou interface alternative) *(reporté — pqxx::stream_from ou COPY BINARY, décision après nouveau profiling)*
+  - ~~`unordered_map` à la place de `map`~~ *(testé, rejeté — cache misses + strings courtes inversent le gain théorique, voir `profiling/fails.md`)*
 - [ ] **Profiling perf** : cache misses, branch mispredictions (après optimisation chargement)
 
 ---
