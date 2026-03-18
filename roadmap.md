@@ -94,7 +94,7 @@ Sortie attendue (chaque ligne des 33M reçoit ses features) :
   - [x] Stocker les dates comme entiers en DB pour éliminer `parse_date` × 33M
   - [ ] Réduire l'overhead `shared_ptr` pqxx (COPY BINARY ou interface alternative) *(reporté — pqxx::stream_from ou COPY BINARY, décision après nouveau profiling)*
   - ~~`unordered_map` à la place de `map`~~ *(testé, rejeté — cache misses + strings courtes inversent le gain théorique, voir `profiling/fails.md`)*
-- [ ] **Profiling perf** : cache misses, branch mispredictions (après optimisation chargement)
+- [x] **Profiling perf** : cache misses, branch mispredictions — LLC misses négligeables (2.1M), frontend bound 23.9% (pqxx templates), backend bound 19.2% (shared_ptr heap). Voir `profiling/profiling_perf_opt2.md`
 
 ---
 
