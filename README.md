@@ -1,50 +1,30 @@
 # Market Insight
 
-Plateforme de backtesting de stratégies d'investissement en C++, appliquée sur des données boursières historiques du NASDAQ (33,7M lignes, 11 727 symboles).
+Terrain d'entraînement au **profiling et à l'optimisation C++**, à grande échelle, sur des données boursières historiques du NASDAQ (33,7M lignes, 11 727 symboles).
+
+Le projet fournit un moteur de backtesting et un calculateur d'indicateurs techniques comme prétexte à des opérations CPU et I/O suffisamment lourdes pour que le profiling révèle de vrais goulots d'étranglement. Chaque phase de la roadmap introduit une charge plus importante et un niveau d'optimisation correspondant - de l'accès PostgreSQL jusqu'à la parallélisation GPU.
 
 ---
 
 ## ✨ Fonctionnalités
 
-### 🎯 Fonctionnalités principales
-
-- 📊 **Backtest Gave (équipondération)** — Teste la théorie de Charles Gave : le portefeuille est redistribué à parts égales à chaque période de rééquilibrage. Les gagnants sont vendus, les perdants rachetés mécaniquement.
-- 📈 **Backtest Buy & Hold** — Stratégie de référence : positions initiales conservées sans rééquilibrage périodique (sauf intégration de nouveaux symboles).
-- ⚖️ **Comparaison chiffrée** — Les deux backtests sont lancés sur les mêmes paramètres et leurs résultats comparés côte à côte (rendement, drawdown, surperformance en points).
-- 🕐 **Dernier prix connu** — Si un symbole n'a pas de cotation à une date donnée (week-end, jour férié, trou de données), le moteur utilise automatiquement le dernier prix disponible.
-- 📥 **Symboles en attente** — Un symbole sans cotation à la date de départ (ex: IPO en cours de période) est mis en attente et intégré automatiquement dès sa première cotation.
-- 🛡️ **Validation des entrées** — Dates invalides, période de rééquilibrage nulle et autres erreurs utilisateur sont détectées avec un message explicite, sans crash.
-
-### 🚀 Points techniques
-
-- **Recherche binaire O(log n)** sur les vecteurs de prix triés (`find_price_at_or_before`, `find_exact_price`)
-- **Itération calendaire** : le moteur avance par pas de `period_days` jours, indépendant des jours de bourse
-- **Fenêtre de simulation automatique** : déduite des données disponibles, pas des dates saisies
-- **Architecture modulaire** : fonctions statiques à responsabilité unique, séparation données / logique / interface
-- **Requêtes SQL paramétrées** via libpqxx (protection injection SQL)
-- **37 tests unitaires + 9 tests d'intégration** sur données réelles
+- **Backtest Gave (équipondération)** - Teste la théorie de Charles Gave : le portefeuille est redistribué à parts égales à chaque rééquilibrage. Les gagnants sont vendus, les perdants rachetés mécaniquement. Gère le délisting (vente au dernier prix connu, exclusion définitive).
+- **Backtest Buy & Hold** - Stratégie de référence : positions initiales conservées sans rééquilibrage périodique.
+- **Comparaison chiffrée** - Les deux backtests sont lancés sur les mêmes paramètres et comparés côte à côte (rendement total, rendement annualisé, drawdown maximum).
+- **Indicateurs techniques sur 33M lignes** - Calcul batch de SMA, EMA, RSI-14, MACD et Bollinger Bands sur l'ensemble de la base, point d'entrée du profiling CPU.
 
 ---
 
 ## 🛠️ Stack technique
 
-### Backend
-
 | Outil | Rôle |
 |-------|------|
-| C++23 / g++-14 | Langage du moteur de backtesting |
+| C++23 / g++-14 | Langage du moteur |
 | libpqxx 7.8.1 | Connexion PostgreSQL depuis C++ |
 | PostgreSQL 15 | Stockage des données historiques |
 | Docker / Compose | Orchestration de la base de données |
 | Google Test | Tests unitaires et d'intégration |
-
-### Pipeline de données
-
-| Outil | Rôle |
-|-------|------|
-| Python 3.12 | Téléchargement et import des données |
-| yfinance | Source des prix historiques NASDAQ |
-| PySpark | Traitement distribué des données brutes |
+| gprof / perf | Profiling CPU et analyse des goulots |
 
 ---
 
@@ -54,7 +34,7 @@ Plateforme de backtesting de stratégies d'investissement en C++, appliquée sur
 
 La théorie de Charles Gave repose sur l'**équipondération avec rééquilibrage périodique** : à chaque période (ex: tous les 30 ou 90 jours), le portefeuille est ramené à une répartition strictement égale entre tous les actifs.
 
-L'effet mécanique : **vendre ce qui a surperformé, racheter ce qui a sous-performé**. Sur le long terme, cet anti-momentum capture la mean-reversion du marché.
+L'effet mécanique : **vendre ce qui a surperformé, racheter ce qui a sous-performé**.
 
 ```
 Exemple — 2 actions, capital 10 000 $, rééquilibrage mensuel :
@@ -63,25 +43,6 @@ Jour 0   : 50 AAPL (5 000 $) + 50 MSFT (5 000 $)
 Jour 30  : AAPL vaut 7 500 $, MSFT vaut 4 000 $ → total 11 500 $
            Rééquilibrage : vente AAPL, achat MSFT → 5 750 $ chacun
 Jour 60  : nouvelle évaluation et redistribution...
-```
-
-### Le moteur de backtest
-
-```
-MarketData (PostgreSQL)
-       │
-       ▼
-  Backtest::execute_backtest(portfolio, strategy)
-       │
-       ├── Jour 0   : distribution initiale sur symboles disponibles
-       │
-       ├── Boucle   : avance par pas de period_days
-       │    ├── Résolution des symboles en attente (pending → available)
-       │    ├── Collecte des prix (dernier connu si trou)
-       │    ├── Rééquilibrage si strategy.should_rebalance()
-       │    └── Enregistrement de la valeur journalière
-       │
-       └── Snapshot final + calcul des métriques
 ```
 
 ### Métriques produites
@@ -101,47 +62,45 @@ MarketData (PostgreSQL)
 ```
 market_insight/
 ├── backend/
-│   ├── include/
-│   │   ├── backtest.hpp             # Moteur de backtesting
-│   │   ├── backtest_result.hpp      # Structure de résultats
-│   │   ├── buy_and_hold_strategy.hpp
-│   │   ├── database.hpp             # Connexion PostgreSQL (RAII)
-│   │   ├── date.hpp                 # Alias Date + parse/format
-│   │   ├── equal_weight_strategy.hpp
-│   │   ├── market_data.hpp          # Chargement des prix
-│   │   ├── portfolio.hpp            # Gestion du portefeuille
-│   │   ├── price.hpp                # Struct OHLCV
-│   │   ├── strategy.hpp             # Interface abstraite Strategy
-│   │   ├── transaction.hpp          # Struct Transaction + OrderType
-│   │   └── user_instruction.hpp     # Paramètres utilisateur
-│   ├── src/
-│   │   ├── backtest.cpp
-│   │   ├── database.cpp
-│   │   ├── date.cpp
-│   │   ├── main.cpp                 # CLI interactive
-│   │   ├── market_data.cpp
-│   │   └── portfolio.cpp
+│   ├── include/          # Headers C++ (moteur, stratégies, données)
+│   ├── src/              # Implémentations + CLI interactive
 │   ├── tests/
-│   │   ├── test_backtest.cpp        # 16 tests unitaires moteur
-│   │   ├── test_database.cpp        # 9 tests intégration DB
-│   │   ├── test_portfolio.cpp       # 12 tests unitaires portfolio
+│   │   ├── test_backtest.cpp
+│   │   ├── test_database.cpp
+│   │   ├── test_portfolio.cpp
+│   │   ├── test_technical_indicators.cpp
 │   │   └── integration/
-│   │       └── test_backtest_integration.cpp  # 9 scénarios données réelles
+│   │       └── test_backtest_integration.cpp
+│   ├── profiling/
+│   │   ├── profiling_report.md              # Synthèse des sessions de profiling
+│   │   ├── profiling_gprof_baseline.txt     # Baseline gprof (Phase 6)
+│   │   ├── profiling_gprof_opt2_bulk.txt    # gprof après optimisation bulk query
+│   │   ├── profiling_perf_opt2.md           # Analyse perf (cache misses, branches)
+│   │   ├── fails.md                         # Optimisations tentées et rejetées
+│   │   └── map_vs_unordered_map/
+│   │       ├── analyse.md
+│   │       ├── perf_map.txt
+│   │       ├── perf_unordered_map.txt
+│   │       ├── time_map.txt
+│   │       └── time_unordered_map.txt
 │   └── Makefile
-├── scripts/
-│   ├── download_full_data.py        # Téléchargement NASDAQ complet
-│   ├── download_test_data.py        # Téléchargement jeu de test
-│   ├── get_nasdaq_symbols.py        # Liste des symboles
-│   ├── import_to_postgres.py        # Import CSV → PostgreSQL
-│   └── validate_data.py             # Validation intégrité des données
+├── scripts/              # Téléchargement et import des données (Python)
 ├── data/
 │   └── test/
-│       └── test_symbols.txt         # Symboles réservés aux tests
+│       └── test_symbols.txt   # Symboles réservés aux tests
 ├── db/
-│   └── schema.sql                   # Schéma PostgreSQL
+│   └── schema.sql
 ├── docker-compose.yml
 └── README.md
 ```
+
+---
+
+## ⚠️ Note sur les données
+
+Le jeu de données complet (33,7M lignes, plusieurs Go de CSV + base PostgreSQL) est actuellement stocké en local uniquement et n'est pas inclus dans ce dépôt. Le projet n'est donc pas entièrement reproductible en l'état - une solution pour rendre les données accessibles est à l'étude.
+
+Les **tests unitaires** (`make test`) ne dépendent pas des données et restent pleinement exécutables. Les **tests d'intégration** (`make test-integration`) et le mode indicateurs techniques requièrent la base PostgreSQL locale.
 
 ---
 
@@ -154,7 +113,6 @@ market_insight/
 - libpqxx 7.8.1
 - libpq-dev
 - Google Test
-- Python 3.12+ (pour le pipeline de données uniquement)
 
 ### 1. Démarrer la base de données
 
@@ -171,24 +129,21 @@ make
 
 ### 3. Lancer la CLI
 
-Le programme est interactif : il demande les paramètres un à un via stdin.
-
 ```bash
 ./build/market_insight
 ```
 
 ```
+=== Market Insight ===
+1. Backtest (Gave vs Buy & Hold)
+2. Indicateurs techniques (batch sur tous les symboles)
+Choix : 1
+
 Symboles (separes par des espaces, ex: AAPL MSFT GOOGL) : AAPL MSFT
 Capital initial ($) : 10000
-Date la plus lointaine est 1970-01-02
 Date de debut (YYYY-MM-DD) : 2020-01-01
 Date de fin (YYYY-MM-DD) : 2024-12-31
 Periode de reequilibrage Gave (jours, ex: 30 90 365) : 90
-
-Symboles : AAPL, MSFT
-Periode  : 2020-01-01 -> 2024-12-31
-Capital  : 10000.00 $
-Reequilibrage Gave : tous les 90 jours
 
 --- Gave - Equiponderation ---
   Valeur finale       : 30126.87 $
@@ -207,16 +162,6 @@ Reequilibrage Gave : tous les 90 jours
 Surperformance Gave vs B&H : +4.68 points
 ```
 
-Il est aussi possible de passer les paramètres directement via un pipe :
-
-```bash
-echo "AAPL MSFT
-10000
-2020-01-01
-2024-12-31
-90" | ./build/market_insight
-```
-
 ### 4. Lancer les tests
 
 ```bash
@@ -226,19 +171,20 @@ make test
 # Tests d'intégration sur données réelles (requièrent Docker)
 make test-integration
 
-# Les deux
-make test-all
+# Valgrind sur les tests unitaires
+make valgrind
 ```
 
 ---
 
-## 🔭 Vision long-terme
+## 🔭 Roadmap
 
-Voir [ROADMAP.md](doc_apprentissage/ROADMAP.md) pour le détail complet des phases à venir :
+Voir [roadmap.md](roadmap.md) pour le détail complet des phases :
 
-- **Phase 5** : délisting, refactoring moteur, export CSV
-- **Phase 6** : parallélisation CPU (std::thread)
-- **Phase 7** : parallélisation GPU (CUDA)
-- **Phase 8** : API REST C++
-- **Phase 9** : frontend React avec graphiques interactifs
-- **Phase 10** : déploiement AWS (EC2 GPU, RDS, S3)
+- **Phase 5** ✅ — Délisting, refactoring moteur
+- **Phase 6** ✅ — Indicateurs techniques, profiling gprof/perf, optimisations PostgreSQL
+- **Phase 7** — Screening / ranking (optimisation SQL + C++)
+- **Phase 8** — Backtest massif sur tout le NASDAQ
+- **Phase 9** — Grid search (parallélisation CPU, thread pool)
+- **Phase 10** — Matrice de corrélations (SIMD + tiling)
+- **Phase 11** — Monte Carlo (GPU CUDA)

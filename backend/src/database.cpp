@@ -58,7 +58,8 @@ std::vector<Price> Database::get_prices(const std::string& symbol,
                                          const std::string& start_date,
                                          const std::string& end_date) {
     std::string query =
-        "SELECT hp.trade_date, hp.open, hp.high, hp.low, hp.close, hp.volume "
+        "SELECT EXTRACT(EPOCH FROM hp.trade_date)::int / 86400, "
+        "       hp.open, hp.high, hp.low, hp.close, hp.volume "
         "FROM historical_prices hp "
         "JOIN symbols s ON hp.symbol_id = s.symbol_id "
         "WHERE s.symbol = $1";
@@ -89,11 +90,10 @@ std::vector<Price> Database::get_prices(const std::string& symbol,
 
     // Pas de vérification de NULL : le schéma SQL impose NOT NULL sur toutes les colonnes
     for (const auto& row : result) {
-        auto date = parse_date(row[0].as<std::string>());
-        if (!date) continue;
+        Date date{std::chrono::days{row[0].as<int>()}};
 
         prices.push_back({
-            *date,
+            date,
             row[1].as<double>(),
             row[2].as<double>(),
             row[3].as<double>(),
@@ -103,4 +103,65 @@ std::vector<Price> Database::get_prices(const std::string& symbol,
     }
 
     return prices;
+}
+
+std::map<std::string, std::vector<Price>>
+Database::get_prices_bulk(const std::vector<std::string>& symbols,
+                           const std::string& start_date,
+                           const std::string& end_date) {
+    if (symbols.empty()) return {};
+
+    // Construit le littéral tableau PostgreSQL : {AAPL,MSFT,...}
+    std::string pg_array = "{";
+    for (std::size_t i = 0; i < symbols.size(); ++i) {
+        if (i > 0) pg_array += ',';
+        pg_array += symbols[i];
+    }
+    pg_array += '}';
+
+    std::string query =
+        "SELECT s.symbol, "
+        "       EXTRACT(EPOCH FROM hp.trade_date)::int / 86400, "
+        "       hp.open, hp.high, hp.low, hp.close, hp.volume "
+        "FROM historical_prices hp "
+        "JOIN symbols s ON hp.symbol_id = s.symbol_id "
+        "WHERE s.symbol = ANY($1::text[])";
+
+    pqxx::params query_params;
+    query_params.append(pg_array);
+    int next_param = 2;
+
+    if (!start_date.empty()) {
+        query += " AND hp.trade_date >= $" + std::to_string(next_param++);
+        query_params.append(start_date);
+    }
+
+    if (!end_date.empty()) {
+        query += " AND hp.trade_date <= $" + std::to_string(next_param++);
+        query_params.append(end_date);
+    }
+
+    query += " ORDER BY s.symbol, hp.trade_date";
+
+    pqxx::work txn(*conn);
+    auto result = txn.exec_params(query, query_params);
+    txn.commit();
+
+    std::map<std::string, std::vector<Price>> data;
+
+    for (const auto& row : result) {
+        const std::string symbol = row[0].as<std::string>();
+        Date date{std::chrono::days{row[1].as<int>()}};
+
+        data[symbol].push_back({
+            date,
+            row[2].as<double>(),
+            row[3].as<double>(),
+            row[4].as<double>(),
+            row[5].as<double>(),
+            row[6].as<long>()
+        });
+    }
+
+    return data;
 }

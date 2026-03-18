@@ -1,0 +1,40 @@
+name: Valgrind
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - '**.hpp'
+      - '**.cpp'
+
+jobs:
+  valgrind:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y valgrind g++-14 libpq-dev \
+            libgtest-dev cmake
+
+      - name: Build libpqxx from source
+        run: |
+          git clone --branch 7.9.2 --depth 1 https://github.com/jtv/libpqxx.git
+          cd libpqxx
+          cmake -DCMAKE_CXX_COMPILER=g++-14 -DCMAKE_INSTALL_PREFIX=/usr/local \
+                -DBUILD_SHARED_LIBS=OFF -DSKIP_BUILD_TEST=ON .
+          make -j$(nproc)
+          sudo make install
+
+      - name: Build Google Test
+        run: |
+          cd /usr/src/googletest
+          sudo cmake -DCMAKE_CXX_COMPILER=g++-14 .
+          sudo make
+          sudo cp lib/*.a /usr/local/lib/
+
+      - name: Build and run valgrind
+        working-directory: backend
+        run: make valgrind

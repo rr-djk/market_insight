@@ -1,0 +1,22 @@
+Avec map
+
+=== Market Insight ===
+1. Backtest Gave vs Buy & Hold
+2. Indicateurs techniques (batch, tous les symboles)
+Choix : Chargement de tous les symboles...
+11727 symboles charges.
+Calcul des indicateurs...
+Termine en 4215.2 ms (4.22 s)
+Symboles traites : 11727
+
+ Performance counter stats for './build/market_insight':
+
+       951,467,060      cpu_atom/cache-misses/           #   48.83% of all cache refs           (10.42%)
+       168,813,096      cpu_core/cache-misses/           #   46.83% of all cache refs           (89.58%)
+     1,948,462,313      cpu_atom/cache-references/                                              (10.42%)
+       360,487,883      cpu_core/cache-references/                                              (89.58%)
+
+     125.981372120 seconds time elapsed
+
+      81.939499000 seconds user
+       7.239254000 seconds sys
