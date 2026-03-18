@@ -1,0 +1,12 @@
+Avec unordered_map
+
+=== Market Insight ===
+1. Backtest Gave vs Buy & Hold
+2. Indicateurs techniques (batch, tous les symboles)
+Choix : Chargement de tous les symboles...
+11727 symboles charges.
+Calcul des indicateurs...
+Termine en 4196.0 ms (4.20 s)
+Symboles traites : 11727
+54.17user 6.48system 1:38.37elapsed 61%CPU (0avgtext+0avgdata 7934112maxresident)k
+0inputs+0outputs (0major+2013041minor)pagefaults 0swaps
