@@ -98,15 +98,19 @@ Sortie attendue (chaque ligne des 33M reçoit ses features) :
 
 ---
 
-## 🔍 Phase 7 — Screening / ranking (optimisation SQL + C++)
+## ✅ Phase 7 — Screening / ranking (optimisation SQL + C++)
 
 **Opération** : trouver les N meilleures actions selon des critères (Sharpe ratio, momentum, volatilité minimale) en scannant toute la base.
 **Pourquoi** : mix SQL lourd + calcul C++. Profiling révèle la frontière entre goulot I/O (PostgreSQL) et goulot calcul.
 
-- [ ] Implémenter un `Screener` : calcul de métriques par symbole (Sharpe, volatilité, momentum)
-- [ ] Requêtes SQL batch optimisées (chargement par chunks vs tout en mémoire)
-- [ ] Ranking et tri des 11 727 symboles
-- [ ] **Profiling** : mesurer la part I/O vs calcul
+- [x] Implémenter `Screener` : Sharpe ratio annualisé (N-1), volatilité annualisée, momentum 12 mois (252 jours)
+- [x] `Database::get_close_prices_bulk` : SELECT close uniquement, paramètres individuels libpqxx (pas de tableau littéral)
+- [x] Chargement par chunks de 500 symboles pour limiter le pic mémoire
+- [x] Ranking `rank_by_sharpe` et `rank_by_momentum` avec filtrage NaN
+- [x] CLI option 3 : bornes de dates, top N, critère de classement, tableau de résultats
+- [x] 14 tests unitaires (`test_screener.cpp`) — 71 tests au total
+- [x] Audit sécurité : injection SQL corrigée, validation dates, guard close≤0, état cin
+- [ ] **Profiling** : mesurer la part I/O vs calcul (à faire sur données réelles)
 - [ ] Optimisation : connection pooling, requêtes pipelinées, cache en mémoire
 - [ ] Mesure avant/après
 
@@ -193,7 +197,7 @@ Sortie attendue (chaque ligne des 33M reçoit ses features) :
 
 ## Prochaine session
 
-**Priorités immédiates (Phase 5) :**
-1. Implémenter le **délisting** dans le moteur + test unitaire correspondant
-2. ~~Refactorer `execute_backtest()`~~ : ✅ fait
-3. (optionnel) Export CSV des valeurs journalières
+**Priorités immédiates (Phase 7 suite) :**
+1. Profiling `Screener::run()` sur données réelles : mesurer part I/O vs calcul par chunk
+2. Optimisation : connection pooling, requêtes pipelinées
+3. Mesure avant/après (perf + chrono par chunk)
