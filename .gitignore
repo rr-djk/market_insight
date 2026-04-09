@@ -1,5 +1,9 @@
 # Fichiers d'apprentissage
 doc_apprentissage/
+AGENTS.md
+CLAUDE.md
+CONVENTIONS.md
+OPENCODE.md
 
 # Données (ne jamais commit les données)
 data/
