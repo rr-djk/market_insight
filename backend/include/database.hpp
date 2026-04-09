@@ -50,6 +50,19 @@ public:
                     const std::string& start_date = "",
                     const std::string& end_date = "");
 
+    /**
+     * Récupère uniquement les prix de clôture de plusieurs symboles en une seule requête.
+     * Plus efficace que get_prices_bulk pour les calculs ne nécessitant que le close.
+     * @param symbols Liste de tickers à charger.
+     * @param start_date Date de début au format "YYYY-MM-DD". Vide pour pas de borne inférieure.
+     * @param end_date Date de fin au format "YYYY-MM-DD". Vide pour pas de borne supérieure.
+     * @return Map symbole → vecteur de Price trié par date croissante (seul close est renseigné).
+     */
+    std::map<std::string, std::vector<Price>>
+    get_close_prices_bulk(const std::vector<std::string>& symbols,
+                          const std::string& start_date = "",
+                          const std::string& end_date = "");
+
 private:
     std::unique_ptr<pqxx::connection> conn;
 

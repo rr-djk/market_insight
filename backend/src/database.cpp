@@ -165,3 +165,65 @@ Database::get_prices_bulk(const std::vector<std::string>& symbols,
 
     return data;
 }
+
+std::map<std::string, std::vector<Price>>
+Database::get_close_prices_bulk(const std::vector<std::string>& symbols,
+                                 const std::string& start_date,
+                                 const std::string& end_date) {
+    if (symbols.empty()) return {};
+
+    // Construction de ARRAY[$1, $2, ..., $N] via paramètres libpqxx individuels
+    // pour éviter toute injection par construction manuelle d'un littéral tableau.
+    pqxx::params query_params;
+    std::string array_placeholders = "ARRAY[";
+    for (std::size_t i = 0; i < symbols.size(); ++i) {
+        if (i > 0) array_placeholders += ',';
+        array_placeholders += '$' + std::to_string(i + 1);
+        query_params.append(symbols[i]);
+    }
+    array_placeholders += ']';
+
+    std::string query =
+        "SELECT s.symbol, "
+        "       EXTRACT(EPOCH FROM hp.trade_date)::int / 86400, "
+        "       hp.close "
+        "FROM historical_prices hp "
+        "JOIN symbols s ON hp.symbol_id = s.symbol_id "
+        "WHERE s.symbol = ANY(" + array_placeholders + "::text[])";
+
+    unsigned int next_param = static_cast<unsigned int>(symbols.size()) + 1u;
+
+    if (!start_date.empty()) {
+        query += " AND hp.trade_date >= $" + std::to_string(next_param++);
+        query_params.append(start_date);
+    }
+
+    if (!end_date.empty()) {
+        query += " AND hp.trade_date <= $" + std::to_string(next_param++);
+        query_params.append(end_date);
+    }
+
+    query += " ORDER BY s.symbol, hp.trade_date";
+
+    pqxx::work txn(*conn);
+    auto result = txn.exec_params(query, query_params);
+    txn.commit();
+
+    std::map<std::string, std::vector<Price>> data;
+
+    for (const auto& row : result) {
+        const std::string sym = row[0].as<std::string>();
+        Date date{std::chrono::days{row[1].as<int>()}};
+
+        data[sym].push_back({
+            date,
+            0.0,
+            0.0,
+            0.0,
+            row[2].as<double>(),
+            0L
+        });
+    }
+
+    return data;
+}

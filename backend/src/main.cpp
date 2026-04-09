@@ -5,9 +5,12 @@
 #include "equal_weight_strategy.hpp"
 #include "market_data.hpp"
 #include "portfolio.hpp"
+#include "screener.hpp"
+#include "screener_result.hpp"
 #include "technical_indicators.hpp"
 #include "user_instruction.hpp"
 #include <chrono>
+#include <cmath>
 #include <iostream>
 #include <print>
 #include <sstream>
@@ -126,6 +129,101 @@ static void run_indicators_mode(Database& db)
 }
 
 // =============================================================================
+// Mode 3 — Screener / Ranking
+// =============================================================================
+
+static void print_screener_results(const std::vector<ScreenerResult>& results)
+{
+    std::println("{:>4}  {:<8}  {:>10}  {:>12}  {:>12}  {:>8}",
+                 "Rang", "Symbole", "Sharpe", "Volatilite", "Momentum12m", "NbJours");
+    std::println("{}", std::string(62, '-'));
+
+    for (std::size_t i = 0; i < results.size(); ++i) {
+        const auto& r = results[i];
+        auto fmt_double = [](double v) -> std::string {
+            if (std::isnan(v)) return "      N/A";
+            char buf[16];
+            std::snprintf(buf, sizeof(buf), "%9.4f", v);
+            return buf;
+        };
+        std::println("{:>4}  {:<8}  {}  {}  {}  {:>8}",
+                     i + 1,
+                     r.symbol,
+                     fmt_double(r.sharpe_ratio),
+                     fmt_double(r.annualized_volatility),
+                     fmt_double(r.momentum_12m),
+                     r.data_points);
+    }
+}
+
+static bool is_valid_date(const std::string& s)
+{
+    if (s.empty()) return true; // vide = pas de borne
+    if (s.size() != 10) return false;
+    for (std::size_t i = 0; i < s.size(); ++i) {
+        if (i == 4 || i == 7) {
+            if (s[i] != '-') return false;
+        } else {
+            if (s[i] < '0' || s[i] > '9') return false;
+        }
+    }
+    return true;
+}
+
+static void run_screener_mode(Database& db)
+{
+    std::string start_str, end_str;
+    std::print("Date de debut (YYYY-MM-DD, vide = tout l'historique) : ");
+    std::getline(std::cin, start_str);
+    if (!is_valid_date(start_str))
+        throw std::invalid_argument("Format de date invalide : " + start_str);
+
+    std::print("Date de fin   (YYYY-MM-DD, vide = tout l'historique) : ");
+    std::getline(std::cin, end_str);
+    if (!is_valid_date(end_str))
+        throw std::invalid_argument("Format de date invalide : " + end_str);
+
+    unsigned int top_n = 0;
+    std::print("Nombre de resultats (top N) : ");
+    std::cin >> top_n;
+    if (!std::cin)
+        throw std::invalid_argument("Valeur invalide pour top N.");
+    if (top_n == 0)
+        throw std::invalid_argument("top_n doit etre au moins 1.");
+
+    std::println("Critere de classement :");
+    std::println("  1. Sharpe ratio");
+    std::println("  2. Momentum 12 mois");
+    std::print("Choix : ");
+    int criterion = 0;
+    std::cin >> criterion;
+    if (criterion != 1 && criterion != 2)
+        throw std::invalid_argument("Critere invalide.");
+
+    std::println("Chargement des symboles...");
+    auto symbols = db.get_symbols();
+    std::println("{} symboles charges. Calcul des metriques par chunks de 500...", symbols.size());
+
+    auto t_start = std::chrono::steady_clock::now();
+
+    Screener screener(db, 500, start_str, end_str);
+    auto results = screener.run(symbols);
+
+    auto t_end = std::chrono::steady_clock::now();
+    double elapsed_ms = std::chrono::duration<double, std::milli>(t_end - t_start).count();
+    std::println("Calcul termine en {:.1f} ms ({:.2f} s)", elapsed_ms, elapsed_ms / 1000.0);
+
+    std::vector<ScreenerResult> ranked;
+    if (criterion == 1)
+        ranked = screener.rank_by_sharpe(results, top_n);
+    else
+        ranked = screener.rank_by_momentum(results, top_n);
+
+    std::println("\nTop {} — critere : {}", top_n, criterion == 1 ? "Sharpe ratio" : "Momentum 12m");
+    print_screener_results(ranked);
+}
+
+// =============================================================================
 // main
 // =============================================================================
 
@@ -135,20 +233,25 @@ int main()
         std::println("=== Market Insight ===");
         std::println("1. Backtest Gave vs Buy & Hold");
         std::println("2. Indicateurs techniques (batch, tous les symboles)");
+        std::println("3. Screener / Ranking (Sharpe, volatilite, momentum)");
         std::print("Choix : ");
 
         int choice = 0;
         std::cin >> choice;
-        std::cin.ignore();
 
         Database db;
 
-        if (choice == 1)
+        if (choice == 1) {
+            std::cin.ignore();
             run_backtest_mode(db);
-        else if (choice == 2)
+        } else if (choice == 2) {
             run_indicators_mode(db);
-        else
+        } else if (choice == 3) {
+            std::cin.ignore();
+            run_screener_mode(db);
+        } else {
             std::println(stderr, "Choix invalide.");
+        }
 
     } catch (const std::exception& e) {
         std::println(stderr, "Erreur : {}", e.what());
