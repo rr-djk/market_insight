@@ -32,7 +32,12 @@ int_test_exec = $(BUILD_DIR)/run_integration_tests
 # Nom de l'exécutable
 exec = $(BUILD_DIR)/market_insight
 
-.PHONY: all run clean rebuild test test-integration test-all valgrind
+# Tests de profiling pipeline DB (tests/integration/test_db_pipeline_profiling.cpp)
+profile_src  = $(INT_TEST_DIR)/test_db_pipeline_profiling.cpp
+profile_obj  = $(BUILD_DIR)/int_test_db_pipeline_profiling.o
+profile_exec = $(BUILD_DIR)/run_profiling_tests
+
+.PHONY: all run clean rebuild test test-integration test-all valgrind test-profile
 
 all: $(exec)
 
@@ -73,6 +78,15 @@ test-all: test test-integration
 valgrind: $(test_exec)
 	valgrind --leak-check=full --track-origins=yes --error-exitcode=1 \
 		--suppressions=valgrind.supp ./$(test_exec)
+
+$(profile_obj): $(profile_src) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(profile_exec): $(OBJS_NO_MAIN) $(profile_obj)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(GTEST_FLAGS)
+
+test-profile: $(profile_exec)
+	./$(profile_exec)
 
 clean:
 	rm -rf $(BUILD_DIR)/*

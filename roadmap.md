@@ -89,26 +89,32 @@ Sortie attendue (chaque ligne des 33M reçoit ses features) :
 - [x] **Baseline mesurée** : `compute_all()` = 3 057 ms, elapsed total = 64.87 s, CPU 59%, RAM 3.04 GB
 - [x] **Profiling gprof** : les indicateurs < 3% du CPU — vrai goulot = désérialisation PostgreSQL (voir `backend/profiling/`)
 - [x] **Leçon** : `fill_n` et `push_back` testés, les deux plus lents — le compilateur vectorise mieux `result[i]` sur taille fixe (voir `backend/profiling/fails.md`)
-- [ ] **Optimisation chargement PostgreSQL** (à faire) :
+- [x] **Optimisation chargement PostgreSQL** :
   - [x] Requête bulk unique au lieu de 11 727 requêtes distinctes
   - [x] Stocker les dates comme entiers en DB pour éliminer `parse_date` × 33M
-  - [ ] Réduire l'overhead `shared_ptr` pqxx (COPY BINARY ou interface alternative) *(reporté — pqxx::stream_from ou COPY BINARY, décision après nouveau profiling)*
-  - ~~`unordered_map` à la place de `map`~~ *(testé, rejeté — cache misses + strings courtes inversent le gain théorique, voir `profiling/fails.md`)*
+  - [x] `txn.stream<>` (bypass `pqxx::result` + shared_ptr) — −18 à −24 % pipeline total
+  - [x] `unordered_map` dans tout le pipeline — 1.92× sur construction C++
+  - [x] `get_close_prices_bulk` dans `MarketData` — −27 à −44 % transfert réseau
+  - [x] **Gain cumulé** : −58 % sur `get_prices_bulk` (55 ms → 23 ms, 10 sym/5 ans). Ratio I/O/RAM : 277× → 54×. Voir `backend/profiling/profiling_db_pipeline_baseline.md`
 - [x] **Profiling perf** : cache misses, branch mispredictions — LLC misses négligeables (2.1M), frontend bound 23.9% (pqxx templates), backend bound 19.2% (shared_ptr heap). Voir `profiling/profiling_perf_opt2.md`
 
 ---
 
-## 🔍 Phase 7 — Screening / ranking (optimisation SQL + C++)
+## ✅ Phase 7 — Screening / ranking (optimisation SQL + C++)
 
 **Opération** : trouver les N meilleures actions selon des critères (Sharpe ratio, momentum, volatilité minimale) en scannant toute la base.
 **Pourquoi** : mix SQL lourd + calcul C++. Profiling révèle la frontière entre goulot I/O (PostgreSQL) et goulot calcul.
 
-- [ ] Implémenter un `Screener` : calcul de métriques par symbole (Sharpe, volatilité, momentum)
-- [ ] Requêtes SQL batch optimisées (chargement par chunks vs tout en mémoire)
-- [ ] Ranking et tri des 11 727 symboles
-- [ ] **Profiling** : mesurer la part I/O vs calcul
-- [ ] Optimisation : connection pooling, requêtes pipelinées, cache en mémoire
-- [ ] Mesure avant/après
+- [x] Implémenter `Screener` : Sharpe ratio annualisé (N-1), volatilité annualisée, momentum 12 mois (252 jours)
+- [x] `Database::get_close_prices_bulk` : SELECT close uniquement, paramètres individuels libpqxx (pas de tableau littéral)
+- [x] Chargement par chunks de 500 symboles pour limiter le pic mémoire
+- [x] Ranking `rank_by_sharpe` et `rank_by_momentum` avec filtrage NaN
+- [x] CLI option 3 : bornes de dates, top N, critère de classement, tableau de résultats
+- [x] 14 tests unitaires (`test_screener.cpp`) — 71 tests au total
+- [x] Audit sécurité : injection SQL corrigée, validation dates, guard close≤0, état cin
+- [x] **Profiling pipeline DB** : mesuré sur 10 symboles — 99.6 % du temps en I/O+pqxx (voir `profiling_db_pipeline_baseline.md`)
+- [x] **Optimisation pipeline DB** : txn.stream<>, unordered_map, close-only MarketData (branche `feature/db-pipeline-opt`)
+- [ ] Optimisation : connection pooling, requêtes pipelinées, COPY BINARY
 
 ---
 
@@ -193,7 +199,6 @@ Sortie attendue (chaque ligne des 33M reçoit ses features) :
 
 ## Prochaine session
 
-**Priorités immédiates (Phase 5) :**
-1. Implémenter le **délisting** dans le moteur + test unitaire correspondant
-2. ~~Refactorer `execute_backtest()`~~ : ✅ fait
-3. (optionnel) Export CSV des valeurs journalières
+**Priorités immédiates (Phase 7 suite) :**
+1. Optimisation : connection pooling, COPY BINARY, requêtes pipelinées (98.8 % du temps toujours en I/O réseau+PostgreSQL)
+2. Profiling `Screener::run()` sur données réelles (11 727 symboles) avec les nouvelles métriques

@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <unordered_map>
 #include "backtest.hpp"
 #include "buy_and_hold_strategy.hpp"
 #include "equal_weight_strategy.hpp"
@@ -13,7 +14,7 @@ static Price make_price(const std::string& date, double close) {
 
 static MarketData make_single_market(const std::string& symbol,
                                      const std::vector<Price>& prices) {
-    std::map<std::string, std::vector<Price>> data;
+    std::unordered_map<std::string, std::vector<Price>> data;
     data[symbol] = prices;
     return MarketData(data);
 }
@@ -22,7 +23,7 @@ static MarketData make_dual_market(const std::string& symbol_a,
                                    const std::vector<Price>& prices_a,
                                    const std::string& symbol_b,
                                    const std::vector<Price>& prices_b) {
-    std::map<std::string, std::vector<Price>> data;
+    std::unordered_map<std::string, std::vector<Price>> data;
     data[symbol_a] = prices_a;
     data[symbol_b] = prices_b;
     return MarketData(data);
@@ -34,7 +35,7 @@ static MarketData make_triple_market(const std::string& sym_a,
                                      const std::vector<Price>& pb,
                                      const std::string& sym_c,
                                      const std::vector<Price>& pc) {
-    std::map<std::string, std::vector<Price>> data;
+    std::unordered_map<std::string, std::vector<Price>> data;
     data[sym_a] = pa;
     data[sym_b] = pb;
     data[sym_c] = pc;
