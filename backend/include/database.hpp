@@ -9,6 +9,13 @@
 #include <pqxx/pqxx>
 #include "price.hpp"
 
+/**
+ * @note Non thread-safe. La connexion pqxx::connection sous-jacente ne supporte pas
+ *       l'accès concurrent. Ne pas partager une instance Database entre plusieurs threads
+ *       sans synchronisation externe. Pendant un appel à get_prices_bulk ou
+ *       get_close_prices_bulk, la connexion est en état COPY et ne peut pas
+ *       traiter d'autres requêtes simultanément.
+ */
 class Database {
 public:
     /**

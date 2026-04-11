@@ -10,11 +10,14 @@
 class MarketData {
 public:
     /**
-     * Charge les prix historiques depuis la base de donnees pour les symboles donnes.
+     * Charge les prix de cloture depuis la base de donnees pour les symboles donnes.
      * @param db Connexion a la base de donnees PostgreSQL.
      * @param symbols Liste des tickers a charger (ex: {"AAPL", "MSFT"}).
      * @param start_date Date de debut au format "YYYY-MM-DD". Vide pour pas de borne inferieure.
      * @param end_date Date de fin au format "YYYY-MM-DD". Vide pour pas de borne superieure.
+     * @warning Seul le champ Price::close est renseigne. Les champs open, high, low et volume
+     *          valent toujours 0. Cette surcharge est optimisee pour backtest et indicateurs
+     *          techniques qui n'ont besoin que du prix de cloture.
      */
     MarketData(Database& db,
                const std::vector<std::string>& symbols,
