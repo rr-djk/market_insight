@@ -8,7 +8,7 @@ MarketData::MarketData(Database& db,
     data = db.get_close_prices_bulk(symbols, start_date, end_date);
 }
 
-MarketData::MarketData(std::map<std::string, std::vector<Price>> raw_data)
+MarketData::MarketData(std::unordered_map<std::string, std::vector<Price>> raw_data)
     : data(std::move(raw_data)) {}
 
 const std::vector<Price>& MarketData::get_prices(const std::string& symbol) const {

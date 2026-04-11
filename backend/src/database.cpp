@@ -105,7 +105,7 @@ std::vector<Price> Database::get_prices(const std::string& symbol,
     return prices;
 }
 
-std::map<std::string, std::vector<Price>>
+std::unordered_map<std::string, std::vector<Price>>
 Database::get_prices_bulk(const std::vector<std::string>& symbols,
                            const std::string& start_date,
                            const std::string& end_date) {
@@ -147,7 +147,7 @@ Database::get_prices_bulk(const std::vector<std::string>& symbols,
     auto result = txn.exec_params(query, query_params);
     txn.commit();
 
-    std::map<std::string, std::vector<Price>> data;
+    std::unordered_map<std::string, std::vector<Price>> data;
 
     for (const auto& row : result) {
         const std::string symbol = row[0].as<std::string>();
@@ -166,7 +166,7 @@ Database::get_prices_bulk(const std::vector<std::string>& symbols,
     return data;
 }
 
-std::map<std::string, std::vector<Price>>
+std::unordered_map<std::string, std::vector<Price>>
 Database::get_close_prices_bulk(const std::vector<std::string>& symbols,
                                  const std::string& start_date,
                                  const std::string& end_date) {
@@ -209,7 +209,7 @@ Database::get_close_prices_bulk(const std::vector<std::string>& symbols,
     auto result = txn.exec_params(query, query_params);
     txn.commit();
 
-    std::map<std::string, std::vector<Price>> data;
+    std::unordered_map<std::string, std::vector<Price>> data;
 
     for (const auto& row : result) {
         const std::string sym = row[0].as<std::string>();

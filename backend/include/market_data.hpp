@@ -1,7 +1,7 @@
 #ifndef MARKET_DATA_HPP
 #define MARKET_DATA_HPP
 
-#include <map>
+#include <unordered_map>
 #include <string>
 #include <vector>
 #include "database.hpp"
@@ -23,9 +23,9 @@ public:
 
     /**
      * Cree un contexte de marche a partir de donnees brutes (sans base de donnees).
-     * @param raw_data Map associant chaque ticker a son historique de prix.
+     * @param raw_data Unordered map associant chaque ticker a son historique de prix.
      */
-    explicit MarketData(std::map<std::string, std::vector<Price>> raw_data);
+    explicit MarketData(std::unordered_map<std::string, std::vector<Price>> raw_data);
 
     /**
      * Retourne l'historique de prix pour un symbole donne.
@@ -43,7 +43,7 @@ public:
     const std::vector<std::string> get_supported_symbols(Database& db);
 
 private:
-    std::map<std::string, std::vector<Price>> data;
+    std::unordered_map<std::string, std::vector<Price>> data;
 };
 
 #endif
