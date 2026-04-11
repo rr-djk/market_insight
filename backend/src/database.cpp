@@ -105,19 +105,23 @@ std::vector<Price> Database::get_prices(const std::string& symbol,
     return prices;
 }
 
-std::map<std::string, std::vector<Price>>
+std::unordered_map<std::string, std::vector<Price>>
 Database::get_prices_bulk(const std::vector<std::string>& symbols,
                            const std::string& start_date,
                            const std::string& end_date) {
     if (symbols.empty()) return {};
 
-    // Construit le littéral tableau PostgreSQL : {AAPL,MSFT,...}
-    std::string pg_array = "{";
+    // txn.stream() utilise COPY en interne et ne supporte pas les paramètres
+    // liés ($1, $2...). Les valeurs sont inlinées via txn.quote() qui échappe
+    // correctement les chaînes pour éviter toute injection SQL.
+    pqxx::work txn(*conn);
+
+    std::string in_list = "(";
     for (std::size_t i = 0; i < symbols.size(); ++i) {
-        if (i > 0) pg_array += ',';
-        pg_array += symbols[i];
+        if (i > 0) in_list += ", ";
+        in_list += txn.quote(symbols[i]);
     }
-    pg_array += '}';
+    in_list += ")";
 
     std::string query =
         "SELECT s.symbol, "
@@ -125,63 +129,42 @@ Database::get_prices_bulk(const std::vector<std::string>& symbols,
         "       hp.open, hp.high, hp.low, hp.close, hp.volume "
         "FROM historical_prices hp "
         "JOIN symbols s ON hp.symbol_id = s.symbol_id "
-        "WHERE s.symbol = ANY($1::text[])";
+        "WHERE s.symbol IN " + in_list;
 
-    pqxx::params query_params;
-    query_params.append(pg_array);
-    int next_param = 2;
-
-    if (!start_date.empty()) {
-        query += " AND hp.trade_date >= $" + std::to_string(next_param++);
-        query_params.append(start_date);
-    }
-
-    if (!end_date.empty()) {
-        query += " AND hp.trade_date <= $" + std::to_string(next_param++);
-        query_params.append(end_date);
-    }
+    if (!start_date.empty())
+        query += " AND hp.trade_date >= " + txn.quote(start_date);
+    if (!end_date.empty())
+        query += " AND hp.trade_date <= " + txn.quote(end_date);
 
     query += " ORDER BY s.symbol, hp.trade_date";
 
-    pqxx::work txn(*conn);
-    auto result = txn.exec_params(query, query_params);
-    txn.commit();
+    std::unordered_map<std::string, std::vector<Price>> data;
 
-    std::map<std::string, std::vector<Price>> data;
-
-    for (const auto& row : result) {
-        const std::string symbol = row[0].as<std::string>();
-        Date date{std::chrono::days{row[1].as<int>()}};
-
-        data[symbol].push_back({
-            date,
-            row[2].as<double>(),
-            row[3].as<double>(),
-            row[4].as<double>(),
-            row[5].as<double>(),
-            row[6].as<long>()
-        });
+    for (const auto& [sym, date_days, open, high, low, close, volume]
+         : txn.stream<std::string, int, double, double, double, double, long>(query)) {
+        Date date{std::chrono::days{date_days}};
+        data[sym].push_back({date, open, high, low, close, volume});
     }
 
+    txn.commit();
     return data;
 }
 
-std::map<std::string, std::vector<Price>>
+std::unordered_map<std::string, std::vector<Price>>
 Database::get_close_prices_bulk(const std::vector<std::string>& symbols,
                                  const std::string& start_date,
                                  const std::string& end_date) {
     if (symbols.empty()) return {};
 
-    // Construction de ARRAY[$1, $2, ..., $N] via paramètres libpqxx individuels
-    // pour éviter toute injection par construction manuelle d'un littéral tableau.
-    pqxx::params query_params;
-    std::string array_placeholders = "ARRAY[";
+    // txn.stream() utilise COPY en interne — paramètres inlinés via txn.quote().
+    pqxx::work txn(*conn);
+
+    std::string in_list = "(";
     for (std::size_t i = 0; i < symbols.size(); ++i) {
-        if (i > 0) array_placeholders += ',';
-        array_placeholders += '$' + std::to_string(i + 1);
-        query_params.append(symbols[i]);
+        if (i > 0) in_list += ", ";
+        in_list += txn.quote(symbols[i]);
     }
-    array_placeholders += ']';
+    in_list += ")";
 
     std::string query =
         "SELECT s.symbol, "
@@ -189,41 +172,23 @@ Database::get_close_prices_bulk(const std::vector<std::string>& symbols,
         "       hp.close "
         "FROM historical_prices hp "
         "JOIN symbols s ON hp.symbol_id = s.symbol_id "
-        "WHERE s.symbol = ANY(" + array_placeholders + "::text[])";
+        "WHERE s.symbol IN " + in_list;
 
-    unsigned int next_param = static_cast<unsigned int>(symbols.size()) + 1u;
-
-    if (!start_date.empty()) {
-        query += " AND hp.trade_date >= $" + std::to_string(next_param++);
-        query_params.append(start_date);
-    }
-
-    if (!end_date.empty()) {
-        query += " AND hp.trade_date <= $" + std::to_string(next_param++);
-        query_params.append(end_date);
-    }
+    if (!start_date.empty())
+        query += " AND hp.trade_date >= " + txn.quote(start_date);
+    if (!end_date.empty())
+        query += " AND hp.trade_date <= " + txn.quote(end_date);
 
     query += " ORDER BY s.symbol, hp.trade_date";
 
-    pqxx::work txn(*conn);
-    auto result = txn.exec_params(query, query_params);
-    txn.commit();
+    std::unordered_map<std::string, std::vector<Price>> data;
 
-    std::map<std::string, std::vector<Price>> data;
-
-    for (const auto& row : result) {
-        const std::string sym = row[0].as<std::string>();
-        Date date{std::chrono::days{row[1].as<int>()}};
-
-        data[sym].push_back({
-            date,
-            0.0,
-            0.0,
-            0.0,
-            row[2].as<double>(),
-            0L
-        });
+    for (const auto& [sym, date_days, close]
+         : txn.stream<std::string, int, double>(query)) {
+        Date date{std::chrono::days{date_days}};
+        data[sym].push_back({date, 0.0, 0.0, 0.0, close, 0L});
     }
 
+    txn.commit();
     return data;
 }

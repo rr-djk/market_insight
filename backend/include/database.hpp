@@ -4,10 +4,18 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <unordered_map>
 #include <memory>
 #include <pqxx/pqxx>
 #include "price.hpp"
 
+/**
+ * @note Non thread-safe. La connexion pqxx::connection sous-jacente ne supporte pas
+ *       l'accès concurrent. Ne pas partager une instance Database entre plusieurs threads
+ *       sans synchronisation externe. Pendant un appel à get_prices_bulk ou
+ *       get_close_prices_bulk, la connexion est en état COPY et ne peut pas
+ *       traiter d'autres requêtes simultanément.
+ */
 class Database {
 public:
     /**
@@ -43,9 +51,9 @@ public:
      * @param symbols Liste de tickers à charger.
      * @param start_date Date de début au format "YYYY-MM-DD". Vide pour pas de borne inférieure.
      * @param end_date Date de fin au format "YYYY-MM-DD". Vide pour pas de borne supérieure.
-     * @return Map symbole → vecteur de Price trié par date croissante.
+     * @return Unordered map symbole → vecteur de Price trié par date croissante.
      */
-    std::map<std::string, std::vector<Price>>
+    std::unordered_map<std::string, std::vector<Price>>
     get_prices_bulk(const std::vector<std::string>& symbols,
                     const std::string& start_date = "",
                     const std::string& end_date = "");
@@ -56,9 +64,9 @@ public:
      * @param symbols Liste de tickers à charger.
      * @param start_date Date de début au format "YYYY-MM-DD". Vide pour pas de borne inférieure.
      * @param end_date Date de fin au format "YYYY-MM-DD". Vide pour pas de borne supérieure.
-     * @return Map symbole → vecteur de Price trié par date croissante (seul close est renseigné).
+     * @return Unordered map symbole → vecteur de Price trié par date croissante (seul close est renseigné).
      */
-    std::map<std::string, std::vector<Price>>
+    std::unordered_map<std::string, std::vector<Price>>
     get_close_prices_bulk(const std::vector<std::string>& symbols,
                           const std::string& start_date = "",
                           const std::string& end_date = "");

@@ -29,6 +29,20 @@ static void print_result(const std::string& label, const BacktestResult& result)
     std::println("  Reequilibrages      : {}", result.total_rebalances);
 }
 
+// Valide qu'un ticker est un symbole boursier standard : [A-Z0-9.\-]{1,10}.
+// Protège contre les entrées surdimensionnées et les caractères inattendus
+// avant que la valeur n'atteigne la couche base de données.
+static bool is_valid_symbol(const std::string& s) {
+    if (s.empty() || s.size() > 10) return false;
+    for (char c : s) {
+        if (!std::isupper(static_cast<unsigned char>(c)) &&
+            !std::isdigit(static_cast<unsigned char>(c)) &&
+            c != '.' && c != '-')
+            return false;
+    }
+    return true;
+}
+
 static UserInstruction read_user_instruction()
 {
     UserInstruction instruction{};
@@ -38,8 +52,11 @@ static UserInstruction read_user_instruction()
     std::getline(std::cin, symbols_line);
     std::istringstream iss(symbols_line);
     std::string symbol;
-    while (iss >> symbol)
+    while (iss >> symbol) {
+        if (!is_valid_symbol(symbol))
+            throw std::invalid_argument("Symbole invalide : " + symbol);
         instruction.symbols.push_back(symbol);
+    }
 
     std::print("Capital initial ($) : ");
     std::cin >> instruction.initial_cash;

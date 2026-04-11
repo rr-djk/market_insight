@@ -1,7 +1,7 @@
 #ifndef MARKET_DATA_HPP
 #define MARKET_DATA_HPP
 
-#include <map>
+#include <unordered_map>
 #include <string>
 #include <vector>
 #include "database.hpp"
@@ -10,11 +10,14 @@
 class MarketData {
 public:
     /**
-     * Charge les prix historiques depuis la base de donnees pour les symboles donnes.
+     * Charge les prix de cloture depuis la base de donnees pour les symboles donnes.
      * @param db Connexion a la base de donnees PostgreSQL.
      * @param symbols Liste des tickers a charger (ex: {"AAPL", "MSFT"}).
      * @param start_date Date de debut au format "YYYY-MM-DD". Vide pour pas de borne inferieure.
      * @param end_date Date de fin au format "YYYY-MM-DD". Vide pour pas de borne superieure.
+     * @warning Seul le champ Price::close est renseigne. Les champs open, high, low et volume
+     *          valent toujours 0. Cette surcharge est optimisee pour backtest et indicateurs
+     *          techniques qui n'ont besoin que du prix de cloture.
      */
     MarketData(Database& db,
                const std::vector<std::string>& symbols,
@@ -23,9 +26,9 @@ public:
 
     /**
      * Cree un contexte de marche a partir de donnees brutes (sans base de donnees).
-     * @param raw_data Map associant chaque ticker a son historique de prix.
+     * @param raw_data Unordered map associant chaque ticker a son historique de prix.
      */
-    explicit MarketData(std::map<std::string, std::vector<Price>> raw_data);
+    explicit MarketData(std::unordered_map<std::string, std::vector<Price>> raw_data);
 
     /**
      * Retourne l'historique de prix pour un symbole donne.
@@ -43,7 +46,7 @@ public:
     const std::vector<std::string> get_supported_symbols(Database& db);
 
 private:
-    std::map<std::string, std::vector<Price>> data;
+    std::unordered_map<std::string, std::vector<Price>> data;
 };
 
 #endif
