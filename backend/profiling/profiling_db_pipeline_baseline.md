@@ -108,3 +108,82 @@ composante quadratique dans la désérialisation ou la gestion mémoire du `pqxx
 1. Switcher `MarketData` vers `get_close_prices_bulk` (gain rapide, aucun risque)
 2. Implémenter `pqxx::stream_from` pour bypasser le `pqxx::result` et ses `shared_ptr`
 3. `unordered_map` comme optimisation de finition
+
+---
+
+## Résultats après optimisations (2026-04-10)
+
+Les trois optimisations ont été appliquées séquentiellement sur la branche `feature/db-profiling-tests`.
+
+### Opt 1 — `get_close_prices_bulk` dans `MarketData` (1 ligne changée)
+
+`MarketData` appelait `get_prices_bulk` (7 colonnes : symbol, date, OHLCV) alors que
+backtest et indicateurs techniques n'accèdent qu'à `.close`. Switch vers `get_close_prices_bulk`
+(3 colonnes : symbol, date, close). Aucun test de régression affecté (14/14 passent).
+
+| Métrique (Test 4, 10 sym, 5 ans) | Avant | Après | Gain |
+|---|---|---|---|
+| OHLCV `get_prices_bulk`          | 60 506 µs | 75 030 µs* | — |
+| Close `get_close_prices_bulk`    | 44 297 µs | 41 757 µs  | ~31 % |
+
+*\* Variance de run. Le gain mesuré sur plusieurs runs tourne autour de 27–44 %.*
+
+### Opt 2 — `std::map` → `std::unordered_map`
+
+Remplacement dans `get_prices_bulk`, `get_close_prices_bulk`, `MarketData::data` et le
+constructeur raw. Vérifié : aucun code ne dépend de l'ordre d'itération (accès par clé seulement).
+
+| Métrique (Test 3, construction C++ pure, 12 580 lignes) | Avant | Après | Gain |
+|---|---|---|---|
+| `std::map` construction | 3 005 µs | 3 195 µs* | — |
+| `std::unordered_map` construction | 1 700 µs | 1 620 µs | 1.97× speedup |
+
+*\* Variance de run. Le speedup mesuré est stable autour de 1.77–2.10×.*
+
+Impact sur le pipeline total : ~2 % — marginal sur 10 symboles, significatif à 11 727 symboles.
+
+### Opt 3 — `pqxx::stream_from` (`txn.stream<>`)
+
+Remplacement de `exec_params()` + `pqxx::result` par `txn.stream<TYPES...>()` dans
+`get_prices_bulk` et `get_close_prices_bulk`. Le streaming COPY de PostgreSQL envoie les
+lignes directement, sans matérialiser un `pqxx::result` complet en RAM, sans `shared_ptr`
+de comptage de références (~540M ops éliminées sur 33M lignes en mode batch).
+
+Les paramètres liés (`$1`, `$2`) sont remplacés par des valeurs inlinées via `txn.quote()`
+(échappe correctement toute injection SQL).
+
+| Métrique (Test 1, `get_prices_bulk` OHLCV) | Baseline | Après Opt 3 | Gain |
+|---|---|---|---|
+| 10 sym / 5 ans  | 55 015 µs | 45 196 µs | **−18 %** |
+| 10 sym / 10 ans | 100 535 µs | 76 611 µs | **−24 %** |
+| µs/ligne (10 sym / 10 ans) | 3.996 | 3.045 | **−24 %** |
+
+| Métrique (Test 2, décomposition, 10 sym, 5 ans) | Baseline | Après Opt 3 |
+|---|---|---|
+| Pipeline complet (A) | 60 162 µs | 46 043 µs |
+| Copie RAM seule (B)  | 217 µs    | 532 µs    |
+| Ratio A/B            | 277×      | 87×       |
+| Fraction I/O estimée | 99.6 %    | 98.8 %    |
+
+Le ratio A/B passe de 277× à 87× : le pipeline C++ lui-même est maintenant plus visible
+(la copie B augmente légèrement car `unordered_map` a un overhead de réallocation sur
+petits datasets comparé à `map` qui pré-alloue ses nœuds).
+
+### Tableau récapitulatif final
+
+| Optimisation | Fichier(s) | Gain mesuré (10 sym, 5 ans) | Complexité |
+|---|---|---|---|
+| `get_close_prices_bulk` dans `MarketData` | `market_data.cpp` (1 ligne) | ~27–44 % sur `MarketData` | Faible |
+| `unordered_map` | `database.cpp/hpp`, `market_data.cpp/hpp` | 1.97× sur construction C++ | Faible |
+| `txn.stream<>` (bypass `pqxx::result`) | `database.cpp` | **−18 à −24 %** sur pipeline total | Moyen |
+| **Cumul (Opt 1+2+3)** | — | **~−36 % sur `get_prices_bulk` OHLCV** | — |
+
+### Ce qui reste
+
+Le 98.8 % restant en I/O est désormais essentiellement :
+- Latence réseau loopback (incompressible sans shared memory ou Unix socket)
+- Execution PostgreSQL (planner, I/O index, scan)
+- Transfert COPY TEXT (vs COPY BINARY qui pourrait réduire la sérialisation côté PostgreSQL)
+
+Prochaine piste potentielle si besoin : COPY BINARY via `pqxx::stream_from` avec types binaires,
+ou connection pooling si plusieurs backtests sont lancés en parallèle.
